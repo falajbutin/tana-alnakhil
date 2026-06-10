@@ -2,7 +2,30 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
+<!-- PWA Manifest -->
+<link rel="manifest" href="manifest.json">
+
+<!-- PWA iOS -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="نخيل الوقف">
+<link rel="apple-touch-icon" href="icon-192x192.png">
+<link rel="apple-touch-icon" sizes="192x192" href="icon-192x192.png">
+<link rel="apple-touch-icon" sizes="512x512" href="icon-512x512.png">
+
+<!-- PWA Android / General -->
+<meta name="theme-color" content="#1e5c33">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="application-name" content="نخيل الوقف">
+<meta name="description" content="نظام إدارة طناء نخيل الوقف - قرية بطين">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192x192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512x512.png">
+
+<!-- Windows -->
+<meta name="msapplication-TileColor" content="#1e5c33">
+<meta name="msapplication-TileImage" content="icon-192x192.png">
 <title>طناء نخيل الوقف - قرية بطين</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -74,14 +97,14 @@
     box-shadow: 0 24px 80px rgba(0,0,0,0.25);
   }
   .login-logo {
-    width: 88px; height: 88px;
-    background: var(--green-700);
-    border-radius: 50%;
+    width: 96px; height: 96px;
+    border-radius: 22px;
     display: flex; align-items: center; justify-content: center;
     margin: 0 auto 20px;
-    font-size: 40px;
-    box-shadow: 0 4px 20px rgba(30,92,51,0.35);
+    overflow: hidden;
+    box-shadow: 0 6px 24px rgba(30,92,51,0.35);
   }
+  .login-logo img { width: 100%; height: 100%; object-fit: cover; border-radius: 22px; }
   .login-title {
     font-size: 22px; font-weight: 800; color: var(--green-800);
     line-height: 1.4; margin-bottom: 6px;
@@ -148,9 +171,9 @@
     box-shadow: 0 2px 12px rgba(0,0,0,0.2);
   }
   .topbar-title {
-    font-size: 17px; font-weight: 700; display: flex; align-items: center; gap: 8px;
+    font-size: 17px; font-weight: 700; display: flex; align-items: center; gap: 10px;
   }
-  .topbar-title span { font-size: 22px; }
+  .topbar-icon { width: 32px; height: 32px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
   .topbar-right { display: flex; align-items: center; gap: 16px; }
   .topbar-date { font-size: 12px; opacity: 0.75; text-align: left; line-height: 1.5; }
   .btn-logout {
@@ -413,7 +436,7 @@
 <!-- ═══════════════ LOGIN ═══════════════ -->
 <div id="login-screen">
   <div class="login-card">
-    <div class="login-logo">🌴</div>
+    <div class="login-logo"><img src="icon-192x192.png" alt="نخيل الوقف"></div>
     <div class="login-title">طناء نخيل الوقف<br>بقرية بطين</div>
     <div class="login-sub">نظام إدارة النخيل والمبيعات</div>
     <div class="login-date-bar">
@@ -430,7 +453,7 @@
 <div id="app">
   <!-- TOP BAR -->
   <div class="topbar">
-    <div class="topbar-title"><span>🌴</span> طناء نخيل الوقف - بطين</div>
+    <div class="topbar-title"><img src="icon-192x192.png" class="topbar-icon" alt=""> طناء نخيل الوقف - بطين</div>
     <div class="topbar-right">
       <div class="topbar-date" id="topbar-date"></div>
       <button class="btn-logout" onclick="doLogout()">خروج ⇤</button>
@@ -3124,6 +3147,79 @@ loadDB();
 clearSaleForm();
 updateDates();
 setInterval(updateDates, 60000);
+</script>
+
+<!-- ══ PWA Install Banner ══ -->
+<div id="pwa-banner" style="
+  display:none; position:fixed; bottom:0; left:0; right:0; z-index:9999;
+  background:var(--green-800); color:#fff; direction:rtl;
+  padding:12px 16px; align-items:center; justify-content:space-between;
+  gap:12px; box-shadow:0 -4px 20px rgba(0,0,0,0.3);
+  font-family:'Tajawal',sans-serif;
+">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <img src="icon-192x192.png" style="width:44px;height:44px;border-radius:10px;flex-shrink:0;" alt="">
+    <div>
+      <div style="font-weight:700;font-size:14px;">ثبّت التطبيق على جهازك</div>
+      <div style="font-size:12px;opacity:0.8;">وصول سريع بدون متصفح</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;flex-shrink:0;">
+    <button id="pwa-install-btn" style="
+      background:#fff;color:var(--green-800);border:none;
+      padding:8px 18px;border-radius:8px;
+      font-family:'Tajawal',sans-serif;font-size:14px;font-weight:700;cursor:pointer;
+    ">تثبيت</button>
+    <button id="pwa-dismiss-btn" style="
+      background:rgba(255,255,255,0.15);color:#fff;
+      border:1px solid rgba(255,255,255,0.3);
+      padding:8px 12px;border-radius:8px;
+      font-family:'Tajawal',sans-serif;font-size:13px;cursor:pointer;
+    ">لاحقاً</button>
+  </div>
+</div>
+
+<script>
+// ── Service Worker ──
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./service-worker.js')
+      .then(reg => console.log('✅ SW registered:', reg.scope))
+      .catch(err => console.warn('SW error:', err));
+  });
+}
+
+// ── PWA Install Prompt ──
+let _deferredPrompt = null;
+const _banner    = document.getElementById('pwa-banner');
+const _installBtn = document.getElementById('pwa-install-btn');
+const _dismissBtn = document.getElementById('pwa-dismiss-btn');
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  _deferredPrompt = e;
+  if (!localStorage.getItem('pwa-dismissed')) {
+    _banner.style.display = 'flex';
+  }
+});
+
+_installBtn.addEventListener('click', async () => {
+  if (!_deferredPrompt) return;
+  _deferredPrompt.prompt();
+  const { outcome } = await _deferredPrompt.userChoice;
+  _deferredPrompt = null;
+  _banner.style.display = 'none';
+  console.log('PWA install:', outcome);
+});
+
+_dismissBtn.addEventListener('click', () => {
+  _banner.style.display = 'none';
+  localStorage.setItem('pwa-dismissed', '1');
+});
+
+window.addEventListener('appinstalled', () => {
+  _banner.style.display = 'none';
+});
 </script>
 </body>
 </html>
