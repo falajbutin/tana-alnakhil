@@ -912,6 +912,20 @@ let cloudDB = null;
 try {
   firebase.initializeApp(firebaseConfig);
   cloudDB = firebase.firestore();
+
+  // ── تفعيل العمل أوف-لاين مع مزامنة تلقائية عند عودة الإنترنت ──
+  cloudDB.enablePersistence({ synchronizeTabs: true })
+    .then(() => console.log("✅ Offline persistence مُفعَّل — التطبيق يعمل بدون إنترنت"))
+    .catch(err => {
+      if (err.code === 'failed-precondition') {
+        console.warn("⚠️ Offline persistence: أكثر من تبويب مفتوح، يعمل في التبويب الأول فقط");
+      } else if (err.code === 'unimplemented') {
+        console.warn("⚠️ Offline persistence: المتصفح لا يدعم هذه الميزة");
+      } else {
+        console.warn("⚠️ Offline persistence خطأ:", err);
+      }
+    });
+
   console.log("Firebase initialized successfully 👍");
 } catch(e) {
   console.warn("⚠️ Firebase غير متاح، التطبيق يعمل بالوضع المحلي:", e.message);
