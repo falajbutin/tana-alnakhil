@@ -453,7 +453,7 @@
 <div id="app">
   <!-- TOP BAR -->
   <div class="topbar">
-    <div class="topbar-title"><img src="icon-192x192.png" class="topbar-icon" alt=""> طناء نخيل الوقف - بطين</div>
+    <div class="topbar-title"><img src="icon-192x192.png" class="topbar-icon" alt=""> طناء نخيل الوقف - قرية بطين</div>
     <div class="topbar-right">
       <div class="topbar-date" id="topbar-date"></div>
       <button class="btn-logout" onclick="doLogout()">خروج ⇤</button>
@@ -500,8 +500,10 @@
         <div class="form-group">
           <label class="form-label">الحالة</label>
           <select class="form-select" id="p-status">
-            <option value="ثمرة">ثمرة</option>
+            <option value="مثمرة">مثمرة</option>
             <option value="غير مثمرة">غير مثمرة</option>
+            <option value="صغيرة">صغيرة</option>
+            <option value="تالفة">تالفة</option>
             <option value="أخرى">أخرى</option>
           </select>
         </div>
@@ -533,8 +535,10 @@
         </select>
         <select class="form-select" id="palm-filter-status" onchange="renderPalmTable()" style="width:auto">
           <option value="">كل الحالات</option>
-          <option value="ثمرة">ثمرة</option>
+          <option value="مثمرة">مثمرة</option>
           <option value="غير مثمرة">غير مثمرة</option>
+          <option value="صغيرة">صغيرة</option>
+          <option value="تالفة">تالفة</option>
           <option value="أخرى">أخرى</option>
           <option value="__sold__">✅ تم الطناء</option>
           <option value="__available__">🟢 متاحة (لم تُطنَّ)</option>
@@ -746,6 +750,11 @@
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
         <div class="card-title" style="margin-bottom: 0;">📋 حالة المشترين المالية</div>
         <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+          <select id="finance-phase-filter" class="form-select" style="width:auto;" onchange="updateFinanceStats(); renderFinanceTable();">
+            <option value="">كل المراحل (إجمالي)</option>
+            <option value="1">المرحلة الأولى (النغال)</option>
+            <option value="2">المرحلة الثانية (الساير)</option>
+          </select>
           <select id="finance-buyer-filter" class="form-select" style="min-width: 220px;" onchange="renderFinanceTable()">
             <option value="">👥 كل المشترين</option>
           </select>
@@ -896,6 +905,160 @@
     </div>
   </div>
 </div>
+
+<!-- ══ نظام التنبيهات والتأكيد الموحّد للنظام (يستبدل alert/confirm المتصفح) ══ -->
+<div id="sys-toast-container" style="
+  position:fixed; top:16px; left:50%; transform:translateX(-50%);
+  z-index:99999; display:flex; flex-direction:column; gap:10px;
+  width:min(92vw, 460px); pointer-events:none;
+"></div>
+
+<div id="sys-confirm-overlay" style="
+  display:none; position:fixed; inset:0; z-index:99998;
+  background:rgba(10,37,20,0.55); align-items:center; justify-content:center;
+  padding:16px; direction:rtl;
+">
+  <div id="sys-confirm-box" style="
+    background:#fff; border-radius:16px; max-width:440px; width:100%;
+    padding:22px 22px 18px; box-shadow:0 20px 60px rgba(0,0,0,0.3);
+    font-family:'Tajawal',sans-serif; text-align:center;
+  ">
+    <div id="sys-confirm-icon" style="font-size:38px; margin-bottom:8px;">⚠️</div>
+    <div id="sys-confirm-title" style="font-size:16px; font-weight:800; color:var(--green-800); margin-bottom:8px;"></div>
+    <div id="sys-confirm-body" style="font-size:13.5px; color:var(--text-muted); line-height:1.7; margin-bottom:18px; white-space:pre-line;"></div>
+    <div style="display:flex; gap:10px;">
+      <button id="sys-confirm-cancel" style="flex:1; background:var(--sand-100); color:var(--text); border:none; padding:11px; border-radius:10px; font-family:'Tajawal',sans-serif; font-size:14px; font-weight:700; cursor:pointer;">إلغاء</button>
+      <button id="sys-confirm-ok" style="flex:1; background:var(--green-600); color:#fff; border:none; padding:11px; border-radius:10px; font-family:'Tajawal',sans-serif; font-size:14px; font-weight:700; cursor:pointer;">تأكيد</button>
+    </div>
+  </div>
+</div>
+
+<div id="sys-prompt-overlay" style="
+  display:none; position:fixed; inset:0; z-index:99998;
+  background:rgba(10,37,20,0.55); align-items:center; justify-content:center;
+  padding:16px; direction:rtl;
+">
+  <div id="sys-prompt-box" style="
+    background:#fff; border-radius:16px; max-width:440px; width:100%;
+    padding:22px 22px 18px; box-shadow:0 20px 60px rgba(0,0,0,0.3);
+    font-family:'Tajawal',sans-serif; text-align:center;
+  ">
+    <div style="font-size:34px; margin-bottom:8px;">🔐</div>
+    <div id="sys-prompt-title" style="font-size:16px; font-weight:800; color:var(--green-800); margin-bottom:8px;"></div>
+    <div id="sys-prompt-body" style="font-size:13.5px; color:var(--text-muted); line-height:1.7; margin-bottom:14px; white-space:pre-line;"></div>
+    <input id="sys-prompt-input" type="text" style="
+      width:100%; padding:11px 14px; border:1.5px solid var(--border); border-radius:10px;
+      font-family:'Tajawal',sans-serif; font-size:14px; text-align:center; margin-bottom:16px;
+      box-sizing:border-box;
+    " />
+    <div style="display:flex; gap:10px;">
+      <button id="sys-prompt-cancel" style="flex:1; background:var(--sand-100); color:var(--text); border:none; padding:11px; border-radius:10px; font-family:'Tajawal',sans-serif; font-size:14px; font-weight:700; cursor:pointer;">إلغاء</button>
+      <button id="sys-prompt-ok" style="flex:1; background:#dc2626; color:#fff; border:none; padding:11px; border-radius:10px; font-family:'Tajawal',sans-serif; font-size:14px; font-weight:700; cursor:pointer;">تأكيد</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Toast نظام إشعارات عائم يعمل من أي صفحة (يستبدل alert المتصفح) ──
+function sysToast(message, type = 'success') {
+  const colors = {
+    success: { bg:'#f0faf3', border:'#2d7a47', text:'#1e5c33', icon:'✅' },
+    error:   { bg:'#fef2f2', border:'#dc2626', text:'#991b1b', icon:'❌' },
+    warning: { bg:'#fff8e1', border:'#f0a500', text:'#7a4800', icon:'⚠️' },
+    info:    { bg:'#eff6ff', border:'#3b82f6', text:'#1e3a8a', icon:'ℹ️' }
+  };
+  const c = colors[type] || colors.success;
+  const container = document.getElementById('sys-toast-container');
+  if (!container) { window.alert(message); return; }
+
+  const toast = document.createElement('div');
+  toast.style.cssText = `
+    background:${c.bg}; border:1.5px solid ${c.border}; color:${c.text};
+    border-radius:12px; padding:13px 16px; font-family:'Tajawal',sans-serif;
+    font-size:13.5px; font-weight:600; line-height:1.6; text-align:right;
+    box-shadow:0 8px 24px rgba(0,0,0,0.15); pointer-events:auto;
+    display:flex; align-items:flex-start; gap:10px;
+    animation:sysToastIn 0.25s ease-out; direction:rtl;
+  `;
+  toast.innerHTML = `<span style="font-size:17px;flex-shrink:0;">${c.icon}</span><span style="flex:1;">${message}</span>
+    <span onclick="this.parentElement.remove()" style="cursor:pointer;opacity:0.5;font-weight:800;flex-shrink:0;">✕</span>`;
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    toast.style.animation = 'sysToastOut 0.25s ease-in forwards';
+    setTimeout(() => toast.remove(), 250);
+  }, 4200);
+}
+
+// ── Confirm نظام تأكيد عائم بديل لـ confirm() المتصفح، يرجع Promise<boolean> ──
+function sysConfirm(message, title = 'تأكيد العملية', okLabel = 'تأكيد', type = 'warning') {
+  return new Promise(resolve => {
+    const overlay   = document.getElementById('sys-confirm-overlay');
+    const titleEl   = document.getElementById('sys-confirm-title');
+    const bodyEl    = document.getElementById('sys-confirm-body');
+    const iconEl    = document.getElementById('sys-confirm-icon');
+    const okBtn     = document.getElementById('sys-confirm-ok');
+    const cancelBtn = document.getElementById('sys-confirm-cancel');
+
+    const icons = { warning:'⚠️', danger:'🗑️', info:'ℹ️', success:'✅' };
+    iconEl.textContent = icons[type] || icons.warning;
+    okBtn.style.background = type === 'danger' ? '#dc2626' : 'var(--green-600)';
+
+    titleEl.textContent = title;
+    bodyEl.textContent  = message;
+    okBtn.textContent   = okLabel;
+    overlay.style.display = 'flex';
+
+    function cleanup(result) {
+      overlay.style.display = 'none';
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      resolve(result);
+    }
+    function onOk()     { cleanup(true); }
+    function onCancel() { cleanup(false); }
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+  });
+}
+
+// ── Prompt نظام إدخال نصي عائم بديل لـ prompt() المتصفح، يرجع Promise<string|null> ──
+function sysPrompt(message, title = 'تأكيد العملية', placeholder = '') {
+  return new Promise(resolve => {
+    const overlay  = document.getElementById('sys-prompt-overlay');
+    const titleEl  = document.getElementById('sys-prompt-title');
+    const bodyEl   = document.getElementById('sys-prompt-body');
+    const inputEl  = document.getElementById('sys-prompt-input');
+    const okBtn    = document.getElementById('sys-prompt-ok');
+    const cancelBtn= document.getElementById('sys-prompt-cancel');
+
+    titleEl.textContent = title;
+    bodyEl.textContent  = message;
+    inputEl.value = '';
+    inputEl.placeholder = placeholder;
+    overlay.style.display = 'flex';
+    setTimeout(() => inputEl.focus(), 100);
+
+    function cleanup(result) {
+      overlay.style.display = 'none';
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      inputEl.removeEventListener('keydown', onKey);
+      resolve(result);
+    }
+    function onOk()     { cleanup(inputEl.value); }
+    function onCancel() { cleanup(null); }
+    function onKey(e)   { if (e.key === 'Enter') onOk(); if (e.key === 'Escape') onCancel(); }
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+    inputEl.addEventListener('keydown', onKey);
+  });
+}
+</script>
+<style>
+@keyframes sysToastIn  { from{opacity:0; transform:translateY(-12px);} to{opacity:1; transform:translateY(0);} }
+@keyframes sysToastOut { from{opacity:1; transform:translateY(0);} to{opacity:0; transform:translateY(-12px);} }
+</style>
 <script>
 // ═══════════════════════════════════════
 // FIREBASE CONFIGURATION & INITIALIZATION
@@ -1076,7 +1239,7 @@ function doLogout() {
   document.getElementById('login-error').style.display = 'none';
 }
 function showInfo() {
-  alert('طناء نخيل الوقف - قرية بطين\nإصدار 1.0\nنظام متكامل لإدارة النخيل وعمليات البيع والمالية\nكلمة المرور الافتراضية: 1234');
+  sysToast('طناء نخيل الوقف - قرية بطين | إصدار 1.0 | نظام متكامل لإدارة النخيل وعمليات البيع والمالية', 'info');
 }
 function showPage(id) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -1103,11 +1266,7 @@ function showAlert(elementId, message, type = 'success') {
       alertDiv.style.display = 'none';
     }, 4000);
   } else {
-    if (type === 'error' || type === 'danger') {
-      alert(`⚠️ تنبيه: ${message}`);
-    } else {
-      alert(`✅ نجاح: ${message}`);
-    }
+    sysToast(message, type === 'error' || type === 'danger' ? 'error' : 'success');
   }
 }
 function suggestNextPalmPlate() {
@@ -1200,7 +1359,7 @@ function deletePalm() {
 }
 function clearPalmForm() {
   ['p-plate','p-taba','p-type','p-loc','p-notes'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('p-status').value = 'ثمرة';
+  document.getElementById('p-status').value = 'مثمرة';
   selectedPalm = null;
   document.querySelectorAll('#palm-tbody tr').forEach(r => r.classList.remove('selected'));
 }
@@ -1212,13 +1371,17 @@ function selectPalm(id) {
 }
 function renderPalmStats() {
   const total = DB.palms.length;
-  const fruit = DB.palms.filter(p=>p.status==='ثمرة').length;
+  const fruit = DB.palms.filter(p=>p.status==='مثمرة').length;
   const nonfruit = DB.palms.filter(p=>p.status==='غير مثمرة').length;
+  const young = DB.palms.filter(p=>p.status==='صغيرة').length;
+  const damaged = DB.palms.filter(p=>p.status==='تالفة').length;
   const other = DB.palms.filter(p=>p.status==='أخرى').length;
   document.getElementById('palm-stats').innerHTML = `
     <div class="stat-card"><div class="stat-label">إجمالي النخيل</div><div class="stat-value">${total}</div></div>
     <div class="stat-card"><div class="stat-label">مثمرة</div><div class="stat-value" style="color:var(--green-600)">${fruit}</div></div>
     <div class="stat-card"><div class="stat-label">غير مثمرة</div><div class="stat-value" style="color:var(--sand-600)">${nonfruit}</div></div>
+    <div class="stat-card"><div class="stat-label">صغيرة</div><div class="stat-value" style="color:var(--sand-600)">${young}</div></div>
+    <div class="stat-card"><div class="stat-label">تالفة</div><div class="stat-value" style="color:var(--danger)">${damaged}</div></div>
     <div class="stat-card"><div class="stat-label">أخرى</div><div class="stat-value" style="color:var(--gold-600)">${other}</div></div>
   `;
 }
@@ -1239,7 +1402,7 @@ function importPalmExcel(input) {
           plate, taba: row['التبعية']||row['taba']||'',
           type: row['الصنف']||row['type']||'',
           loc: row['الموقع']||row['loc']||'',
-          status: row['الحالة']||row['status']||'ثمرة',
+          status: row['الحالة']||row['status']||'مثمرة',
           notes: row['ملاحظات']||row['notes']||''
         });
         added++;
@@ -1300,7 +1463,7 @@ function deleteBuyer() {
     showAlert('buyer-alert','تم الحذف');
   });
 }
-function deleteAllPalmsData() {
+async function deleteAllPalmsData() {
   const hasSales = Array.isArray(DB.sales) && DB.sales.length > 0;
   const hasPayments = Array.isArray(DB.payments) && DB.payments.length > 0;
   if (hasSales || hasPayments) {
@@ -1313,13 +1476,13 @@ function deleteAllPalmsData() {
       // رفع الصفحة للأعلى ليشاهد المستخدم التنبيه
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
-      alert(msg);
+      sysToast(msg, 'error');
     }
     return; // إيقاف الدالة فوراً ومنع الحذف
   }
-  const confirmFirst = confirm("🚨 تحذير أمني حرج:\nأنت على وشك مسح جدول النخيل بالكامل من قاعدة البيانات بشكل نهائي!\n\nهل تريد الاستمرار؟");
+  const confirmFirst = await sysConfirm("أنت على وشك مسح جدول النخيل بالكامل من قاعدة البيانات بشكل نهائي!\nهل تريد الاستمرار؟", "🚨 تحذير أمني حرج", "استمرار", "danger");
   if (!confirmFirst) return;
-  const verifyText = prompt("⚠️ لتأكيد الحذف النهائي لأصول النخيل، اكتب العبارة التالية بدقة في الحقل أدناه:\n(حذف النخيل)");
+  const verifyText = await sysPrompt("اكتب العبارة التالية بدقة للتأكيد:\n(حذف النخيل)", "⚠️ تأكيد الحذف النهائي", "حذف النخيل");
   if (verifyText === "حذف النخيل") {
     DB.palms = [];
     saveDB();
@@ -1328,7 +1491,7 @@ function deleteAllPalmsData() {
     if (typeof populateSaleDropdowns === "function") populateSaleDropdowns(); // لتفريغ قائمة الطناء
     if (typeof updateDashboardStats === "function") updateDashboardStats();
     const alertDiv = document.getElementById('palm-alert') || document.getElementById('sales-alert');
-    const successMsg = "🗑️ تم حذف كامل بيانات النخيل بنجاح من قاعدة البيانات السحابية والمحلية.";
+    const successMsg = "🗑️ تم حذف كامل بيانات النخيل بنجاح من قاعدة البيانات.";
     if (alertDiv) {
       alertDiv.innerHTML = successMsg;
       alertDiv.className = "alert alert-success";
@@ -1336,10 +1499,10 @@ function deleteAllPalmsData() {
       setTimeout(() => { alertDiv.style.display = "none"; }, 5000);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
-      alert(successMsg);
+      sysToast(successMsg, "success");
     }
-  } else {
-    alert("❌ تم إلغاء عملية الحذف؛ العبارة التأكيدية غير صحيحة.");
+  } else if (verifyText !== null) {
+    sysToast("تم إلغاء عملية الحذف؛ العبارة التأكيدية غير صحيحة.", "error");
   }
 }
 function clearBuyerForm() {
@@ -1394,7 +1557,7 @@ function selectBuyer(id) {
 }
 function exportBuyersExcel() {
   if (!DB || !Array.isArray(DB.buyers) || DB.buyers.length === 0) {
-    alert("⚠️ لا توجد بيانات مشترين لتصديرها!");
+    sysToast("لا توجد بيانات مشترين لتصديرها!", "warning");
     return;
   }
   const data = DB.buyers.map((b, index) => ({
@@ -1425,7 +1588,7 @@ function importBuyersExcel(event) {
       const worksheet = workbook.Sheets[firstSheetName];
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
       if (jsonData.length === 0) {
-        alert("⚠️ الملف المرفوع فارغ أو يحتوي على تنسيق خاطئ!");
+        sysToast("الملف المرفوع فارغ أو يحتوي على تنسيق خاطئ!", "warning");
         return;
       }
       if (!DB.buyers) DB.buyers = [];
@@ -1451,37 +1614,37 @@ function importBuyersExcel(event) {
         saveDB(); // الحفظ الفوري السحابي والمحلي
         if (typeof renderBuyerTable === "function") renderBuyerTable();
         if (typeof populateSaleDropdowns === "function") populateSaleDropdowns(); // تحديث القوائم المنسدلة في الطناء
-        alert(`✅ تم استيراد وإضافة (${importedCount}) مشتري جديد بنجاح إلى قاعدة البيانات.`);
+        sysToast(`تم استيراد وإضافة (${importedCount}) مشتري جديد بنجاح إلى قاعدة البيانات.`, "success");
       } else {
-        alert("ℹ️ لم يتم إضافة مشترين جدد (قد يكون جميع المشترين مسجلين مسبقاً في النظام).");
+        sysToast("لم يتم إضافة مشترين جدد (قد يكون جميع المشترين مسجلين مسبقاً في النظام).", "info");
       }
     } catch (error) {
       console.error(error);
-      alert("❌ حدث خطأ أثناء قراءة ملف الـ Excel. تأكد من سلامة تنسيق الأعمدة!");
+      sysToast("حدث خطأ أثناء قراءة ملف الـ Excel. تأكد من سلامة تنسيق الأعمدة!", "error");
     }
     document.getElementById('excel-buyers-file').value = "";
   };
   reader.readAsArrayBuffer(file);
 }
-function deleteAllBuyersData() {
+async function deleteAllBuyersData() {
   const hasSales = Array.isArray(DB.sales) && DB.sales.length > 0;
   const hasPayments = Array.isArray(DB.payments) && DB.payments.length > 0;
   if (hasSales || hasPayments) {
-    alert("❌ تحذير أمني: لا يمكن حذف المشترين! توجد عمليات طناء نخيل أو أرصدة مالية وسندات مسجلة مرتبطة بأسماء المشترين الحالية. يرجى تصفية الحسابات والعمليات المالية أولاً من صفحة الإعدادات للبدء من جديد.");
+    sysToast("تحذير أمني: لا يمكن حذف المشترين! توجد عمليات طناء نخيل أو أرصدة مالية وسندات مسجلة مرتبطة بأسماء المشترين الحالية. يرجى تصفية الحسابات والعمليات المالية أولاً من صفحة الإعدادات للبدء من جديد.", "error");
     return; // إيقاف الحذف فوراً لحماية أمان البيانات
   }
-  const confirmFirst = confirm("🚨 تحذير حرج جداً:\nأنت على وشك مسح جدول الأسماء وكافة المشترين المسجلين في الوقف نهائياً!\n\nهل تريد الاستمرار؟");
+  const confirmFirst = await sysConfirm("أنت على وشك مسح جدول الأسماء وكافة المشترين المسجلين في الوقف نهائياً!\nهل تريد الاستمرار؟", "🚨 تحذير حرج جداً", "استمرار", "danger");
   if (!confirmFirst) return;
-  const verifyText = prompt("⚠️ لتأكيد الحذف النهائي الشامل للمشترين، اكتب العبارة التالية بدقة في الحقل أدناه:\n(حذف المشترين)");
+  const verifyText = await sysPrompt("اكتب العبارة التالية بدقة للتأكيد:\n(حذف المشترين)", "⚠️ تأكيد الحذف النهائي", "حذف المشترين");
   if (verifyText === "حذف المشترين") {
     DB.buyers = [];
     saveDB();
     if (typeof renderBuyerTable === "function") renderBuyerTable();
     if (typeof populateSaleDropdowns === "function") populateSaleDropdowns();
     if (typeof updateDashboardStats === "function") updateDashboardStats();
-    alert("🗑️ تم حذف كامل بيانات وجدول المشترين بنجاح من قاعدة البيانات السحابية والمحلية.");
-  } else {
-    alert("❌ تم إلغاء عملية الحذف؛ العبارة التأكيدية غير صحيحة.");
+    sysToast("تم حذف كامل بيانات وجدول المشترين بنجاح من قاعدة البيانات.", "success");
+  } else if (verifyText !== null) {
+    sysToast("تم إلغاء عملية الحذف؛ العبارة التأكيدية غير صحيحة.", "error");
   }
 }
 function shareBuyerBalanceWhatsApp(buyerId) {
@@ -1502,8 +1665,8 @@ function shareBuyerBalanceWhatsApp(buyerId) {
 💵 *إجمالي المبلغ المطلوب:* ${totalDue.toFixed(3)} ر.ع
 ✅ *إجمالي المبالغ المدفوعة:* ${totalPaid.toFixed(3)} ر.ع
 📌 *المبلغ المتبقي المستحق:* *${remaining.toFixed(3)} ر.ع*
-شاكرين لكم حسن تعاونكم وتواصلكم الدائم مع لجنة الأوقاف.
-_تم الإرسال تلقائياً من نظام إدارة الوقف السحابي_`;
+شاكرين لكم حسن تعاونكم وتواصلكم الدائم مع وكلاء الوقف.
+_تم الإرسال تلقائياً من نظام إدارة الوقف - قرية بطين`;
   sendWhatsAppMessage(buyer.phone, messageText);
 }
 function viewBuyerPayments(buyerId, event) {
@@ -1565,7 +1728,7 @@ function populateSaleDropdowns() {
   const available = DB.palms.filter(p => {
     const isSold = soldIds.has(String(p.id));
     const st = (p.status||'').trim();
-    return !isSold && st !== 'غير مثمرة' && st !== 'مستبعد';
+    return !isSold && st !== 'غير مثمرة' && st !== 'صغيرة' && st !== 'تالفة';
   });
   const counter = document.getElementById('s-plate-count');
   if (counter) counter.textContent = `(${available.length} نخلة متاحة)`;
@@ -1579,7 +1742,7 @@ function getAvailablePalms() {
   return DB.palms.filter(p => {
     const isSold = soldIds.has(String(p.id));
     const st = (p.status || '').trim();
-    return !isSold && st !== 'غير مثمرة' && st !== 'مستبعد';
+    return !isSold && st !== 'غير مثمرة' && st !== 'صغيرة' && st !== 'تالفة';
   });
 }
 
@@ -1711,7 +1874,7 @@ function reportSaleByTaba() {
   const currentYear = DB.year || new Date().getFullYear();
   const filteredSales = DB.sales.filter(s => !targetTaba || (s.taba || '').trim() === targetTaba);
   if (!filteredSales.length) {
-    alert("لا توجد عمليات بيع مسجلة لهذه التبعية!");
+    sysToast("لا توجد عمليات بيع مسجلة لهذه التبعية!", "warning");
     return;
   }
   const totalAmount = filteredSales.reduce((sum, s) => sum + (parseFloat(s.amount) || 0), 0);
@@ -1724,7 +1887,7 @@ function reportSaleByBuyer() {
   const currentYear = DB.year || new Date().getFullYear();
   const filteredSales = DB.sales.filter(s => !buyerId || String(s.buyerId) === String(buyerId));
   if (!filteredSales.length) {
-    alert("لا توجد عمليات بيع مسجلة لهذا المشتري!");
+    sysToast("لا توجد عمليات بيع مسجلة لهذا المشتري!", "warning");
     return;
   }
   const buyerObj = DB.buyers.find(b => String(b.id) === String(buyerId));
@@ -1801,7 +1964,7 @@ function generateBuyerPDFReport(salesData, reportTitle, totalAmount, currentYear
         </tr>
       </tbody>
     </table>
-    <div class="ftr">تطبيق إدارة الوقف الذكي سحابياً © ${currentYear}</div>`;
+    <div class="ftr">تطبيق إدارة الوقف - قرية بطين © ${currentYear}</div>`;
 
   const host = document.createElement('div');
   host.style.cssText = 'position:absolute;top:0;left:0;width:100%;background:#fff;z-index:-9999;opacity:0;pointer-events:none;';
@@ -1928,7 +2091,7 @@ function generateSalesPDFReport(salesData, reportTitle, totalAmount, currentYear
 
   const footer = document.createElement('div');
   footer.className = 'rpt-footer';
-  footer.textContent = `تطبيق إدارة الوقف الذكي سحابياً © ${currentYear}`;
+  footer.textContent = `تطبيق إدارة الوقف - قرية بطين © ${currentYear}`;
   container.appendChild(footer);
 
   const savedScroll = window.scrollY;
@@ -1988,7 +2151,7 @@ function saveSale() {
       alertDiv.className = `alert alert-${type}`;
       alertDiv.style.display = 'block';
       window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else { alert(message); }
+    } else { sysToast(message, type); }
   }
   if (!palmId) {
     showSaleAlert("⚠️ يرجى اختيار رقم اللوحة الخاص بالنخلة أولاً.", "error"); return;
@@ -2057,7 +2220,7 @@ function saveSale() {
       const oldSale = DB.sales[saleIndex];
       if (String(oldSale.palmId) !== String(palmId)) {
         const oldPalm = DB.palms.find(p => p.id === oldSale.palmId);
-        if (oldPalm) { oldPalm.status = 'ثمرة'; oldPalm.buyerId = null; oldPalm.buyerName = ''; oldPalm.amount = 0; }
+        if (oldPalm) { oldPalm.status = 'مثمرة'; oldPalm.buyerId = null; oldPalm.buyerName = ''; oldPalm.amount = 0; }
       }
       Object.assign(oldSale, { palmId: palm.id, palmPlate: palm.plate, taba: palm.taba, type: palm.type,
         buyerId: buyer.id, buyerName: buyer.name, amount, phase, date: saleDate, notes });
@@ -2134,7 +2297,7 @@ function deleteSale(){
     if (saleBeingDeleted) {
       const relatedPalm = DB.palms.find(p => p.id === saleBeingDeleted.palmId);
       if (relatedPalm) {
-        relatedPalm.status = 'ثمرة';
+        relatedPalm.status = 'مثمرة';
         relatedPalm.buyerId = null;
         relatedPalm.buyerName = '';
         relatedPalm.amount = 0;
@@ -2214,14 +2377,12 @@ function renderSalesTable() {
     const displayType = palm ? palm.type : (s.type || '-');
     const saleAmount = parseFloat(s.amount) || 0;
     totalAmount += saleAmount;
-    // حساب المتبقي على هذا المشتري لهذه العملية تحديداً
-    const buyerPayments = (DB.payments || []).filter(p => String(p.buyerId) === String(s.buyerId));
-    const totalPaid = buyerPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
-    const buyerSales = DB.sales.filter(bs => String(bs.buyerId) === String(s.buyerId));
-    const totalDue = buyerSales.reduce((sum, bs) => sum + (parseFloat(bs.amount) || 0), 0);
-    const remaining = totalDue - totalPaid;
+    // حساب المتبقي لهذه العملية تحديداً (مدفوعات مرتبطة بـ saleId هذه العملية فقط)
+    const salePaid = (DB.payments || []).filter(p => String(p.saleId) === String(s.id))
+      .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+    const remaining = saleAmount - salePaid;
     let remainingDisplay;
-    if (remaining <= 0) {
+    if (remaining <= 0.001) {
       remainingDisplay = `<span class="badge badge-green" style="font-size:11px; padding:3px 8px;">✅ مسدد</span>`;
     } else {
       remainingDisplay = `<span style="font-weight:bold; color:#dc2626;">${remaining.toFixed(3)}</span>`;
@@ -2275,11 +2436,11 @@ function closePhase() {
     showAlert('sales-alert', '📌 النظام في المرحلة الثانية بالفعل. لإغلاق الموسم بالكامل استخدم زر (إغلاق وتغيير السنة).', 'info');
   }
 }
-function closeYear() {
+async function closeYear() {
   const currentYear = DB.year || new Date().getFullYear();
-  const nextYearInput = prompt("أدخل السنة المالية الجديدة التي تريد الانتقال إليها أو فتحها (مثال: 2027):", currentYear + 1);
+  const nextYearInput = await sysPrompt("أدخل السنة المالية الجديدة التي تريد الانتقال إليها أو فتحها:", "📅 ترحيل السنة المالية", String(currentYear + 1));
   if (!nextYearInput || isNaN(nextYearInput)) {
-    showAlert('sales-alert', 'يرجى إدخال سنة صحيحة تزيد عن السنة الحالية', 'error');
+    if (nextYearInput !== null) showAlert('sales-alert', 'يرجى إدخال سنة صحيحة تزيد عن السنة الحالية', 'error');
     return;
   }
   const nextYear = parseInt(nextYearInput);
@@ -2309,7 +2470,7 @@ function closeYear() {
       showAlert('sales-alert', `✅ تم إغلاق عام ${currentYear}م، وفتح حسابات عام ${nextYear}م بنجاح مع ترحيل النخيل والمشترين.`, 'success');
     } catch (error) {
       console.error("خطأ أثناء الإغلاق السنوي:", error);
-      alert("حدث خطأ أثناء معالجة الإغلاق السنوي سحابياً.");
+      sysToast("حدث خطأ أثناء معالجة الإغلاق السنوي.", "error");
     }
   });
 }
@@ -2362,6 +2523,8 @@ function renderFinanceTable() {
   const tbody = document.getElementById('finance-tbody');
   if (!tbody) return;
 
+  const phaseFilter = (document.getElementById('finance-phase-filter') || {}).value || '';
+
   // ملء قائمة فلتر المشترين
   const filterSel = document.getElementById('finance-buyer-filter');
   if (filterSel) {
@@ -2376,7 +2539,6 @@ function renderFinanceTable() {
     filterSel.value = currentVal;
   }
 
-  // إظهار/إخفاء زر واتساب
   const waBtn = document.getElementById('finance-whatsapp-btn');
   const selectedBuyerIdFilter = filterSel ? filterSel.value : '';
   if (waBtn) waBtn.style.display = selectedBuyerIdFilter ? 'flex' : 'none';
@@ -2386,7 +2548,17 @@ function renderFinanceTable() {
     return;
   }
 
-  // تحديد المشترين للعرض
+  // ── دالة حساب مدفوع عملية بيع واحدة (مدفوعات مرتبطة بـ saleId) ──
+  function getSalePaid(saleId) {
+    return DB.payments.filter(p => String(p.saleId) === String(saleId))
+      .reduce((a, p) => a + parseFloat(p.amount || 0), 0);
+  }
+  // ── دالة حساب مدفوعات شاملة (غير مرتبطة بعملية معينة) لمشتري ──
+  function getBuyerLumpPaid(buyerId) {
+    return DB.payments.filter(p => !p.saleId && String(p.buyerId) === String(buyerId))
+      .reduce((a, p) => a + parseFloat(p.amount || 0), 0);
+  }
+
   let buyersToShow = DB.buyers;
   if (selectedBuyerIdFilter) {
     buyersToShow = DB.buyers.filter(b => String(b.id) === String(selectedBuyerIdFilter));
@@ -2394,65 +2566,73 @@ function renderFinanceTable() {
 
   const rows = [];
   buyersToShow.forEach(b => {
-    const buyerSales = DB.sales.filter(s => String(s.buyerId) === String(b.id));
-    const total = buyerSales.reduce((a, s) => a + parseFloat(s.amount || 0), 0);
-    const paid = DB.payments.filter(p => String(p.buyerId) === String(b.id)).reduce((a, p) => a + parseFloat(p.amount || 0), 0);
+    let buyerSales = DB.sales.filter(s => String(s.buyerId) === String(b.id));
+    if (phaseFilter) buyerSales = buyerSales.filter(s => String(s.phase) === String(phaseFilter));
+    const lumpPaid = phaseFilter ? 0 : getBuyerLumpPaid(b.id); // الدفعات الشاملة تُحسب فقط بدون فلتر مرحلة
+    const totalSalesAmt = buyerSales.reduce((a, s) => a + parseFloat(s.amount || 0), 0);
+    const totalPerSalePaid = buyerSales.reduce((a, s) => a + getSalePaid(s.id), 0);
+    const total = totalSalesAmt;
+    const paid = totalPerSalePaid + lumpPaid;
     if (total === 0 && paid === 0) return;
     const rem = total - paid;
 
     if (selectedBuyerIdFilter && String(b.id) === String(selectedBuyerIdFilter)) {
-      // عرض تفصيلي: صف لكل نخلة
+      // ── عرض تفصيلي: صف لكل نخلة مع سداد مستقل لكل عملية ──
       buyerSales.forEach((s, idx) => {
         const palm = DB.palms.find(p => String(p.id) === String(s.palmId));
         const plateDisplay = palm ? palm.plate : (s.palmPlate || '-');
         const saleAmount = parseFloat(s.amount) || 0;
-        // حساب المدفوع التراكمي لهذا المشتري
+        const salePaid = getSalePaid(s.id);
+        const saleRem = saleAmount - salePaid;
         const isFirstRow = idx === 0;
         rows.push(`<tr style="background:${idx % 2 === 0 ? '#fff' : '#f9fafb'}">
           ${isFirstRow
-            ? `<td rowspan="${buyerSales.length}" style="font-weight:700; vertical-align:middle; text-align:center; background:#f0faf3; border-left: 3px solid var(--green-400);">${b.name}</td>`
+            ? `<td rowspan="${buyerSales.length + 1}" style="font-weight:700; vertical-align:middle; text-align:center; background:#f0faf3; border-left: 3px solid var(--green-400);">${b.name}</td>`
             : ''
           }
           <td style="text-align:center;"><b>${plateDisplay}</b>${s.type ? `<br><small style="color:var(--text-muted)">${s.type}</small>` : ''}</td>
           <td style="text-align:center; color:var(--green-700); font-weight:700;">${saleAmount.toFixed(3)}</td>
           <td style="text-align:center;">
-            ${isFirstRow ? `
-              <div style="display:flex; align-items:center; gap:6px; justify-content:center;">
-                <input type="number" step="0.001" min="0"
-                  id="quick-pay-${b.id}"
-                  value="${paid.toFixed(3)}"
-                  style="width:100px; padding:5px 8px; border:1.5px solid var(--border); border-radius:6px; font-family:'Tajawal',sans-serif; font-size:13px; text-align:center;"
-                  oninput="updateQuickPay(${b.id})"
-                />
-                <button onclick="saveQuickPay(${b.id})" style="background:var(--green-600);color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:13px;font-family:'Tajawal',sans-serif;">💾</button>
-              </div>
-            ` : '&nbsp;'}
+            <div style="display:flex; align-items:center; gap:6px; justify-content:center; flex-wrap:wrap;">
+              <input type="number" step="0.001" min="0"
+                id="sale-pay-${s.id}"
+                value="${salePaid.toFixed(3)}"
+                style="width:90px; padding:5px 8px; border:1.5px solid var(--border); border-radius:6px; font-family:'Tajawal',sans-serif; font-size:13px; text-align:center;"
+                oninput="updateSalePayPreview(${s.id}, ${saleAmount})"
+              />
+              <button onclick="saveSalePayment(${s.id}, ${b.id})" title="حفظ سداد هذه العملية" style="background:var(--green-600);color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:13px;font-family:'Tajawal',sans-serif;">💾</button>
+              <button onclick="markSaleFullyPaid(${s.id}, ${b.id}, ${saleAmount})" title="تسديد كامل لهذه العملية فقط" style="background:var(--green-50);color:var(--green-700);border:1.5px solid var(--green-400);border-radius:6px;padding:5px 8px;cursor:pointer;font-size:12px;font-family:'Tajawal',sans-serif;">✅ كامل</button>
+              ${salePaid > 0.0001 ? `<button onclick="undoSalePayment(${s.id}, ${b.id})" title="تراجع عن سداد هذه العملية" style="background:#fff5f5;color:#dc2626;border:1.5px solid #fca5a5;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:12px;font-family:'Tajawal',sans-serif;">↩️ تراجع</button>` : ''}
+            </div>
           </td>
-          <td rowspan="${isFirstRow ? buyerSales.length : 0}" style="${isFirstRow ? 'vertical-align:middle;text-align:center;' : 'display:none'}">
-            ${isFirstRow ? `<span id="rem-display-${b.id}" style="font-weight:800; font-size:15px; color:${rem > 0 ? 'var(--danger)' : 'var(--green-600)'};">${rem <= 0 ? '✅ مسدد' : rem.toFixed(3) + ' ر.ع'}</span>` : ''}
+          <td style="text-align:center;">
+            <span id="sale-rem-${s.id}" style="font-weight:700; font-size:13px; color:${saleRem > 0.001 ? 'var(--danger)' : 'var(--green-600)'};">${saleRem <= 0.001 ? '✅ مسدد' : saleRem.toFixed(3) + ' ر.ع'}</span>
           </td>
         </tr>`);
       });
-    } else {
-      // عرض ملخص (كل المشترين)
-      rows.push(`<tr style="cursor:pointer;" onclick="filterFinanceByBuyer(${b.id})">
-        <td><b>${b.name}</b></td>
-        <td style="text-align:center; color:var(--text-muted); font-size:12px;">اضغط لعرض التفاصيل</td>
-        <td style="color:var(--green-700);font-weight:700; text-align:center;">${total.toFixed(3)}</td>
+      // صف إجمالي + زر سداد الكل دفعة واحدة + زر تراجع شامل
+      rows.push(`<tr style="background:#f0faf3; border-top:2px solid var(--green-400);">
+        <td style="text-align:center; font-weight:800;">إجمالي</td>
+        <td style="text-align:center; font-weight:800; color:var(--green-700);">${total.toFixed(3)}</td>
         <td style="text-align:center;">
-          <div style="display:flex; align-items:center; gap:6px; justify-content:center;">
-            <input type="number" step="0.001" min="0"
-              id="quick-pay-${b.id}"
-              value="${paid.toFixed(3)}"
-              style="width:100px; padding:5px 8px; border:1.5px solid var(--border); border-radius:6px; font-family:'Tajawal',sans-serif; font-size:13px; text-align:center;"
-              oninput="updateQuickPay(${b.id})"
-              onclick="event.stopPropagation()"
-            />
-            <button onclick="event.stopPropagation(); saveQuickPay(${b.id})" style="background:var(--green-600);color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:13px;font-family:'Tajawal',sans-serif;">💾</button>
+          <div style="display:flex; gap:6px; justify-content:center; flex-wrap:wrap;">
+            <button onclick="markAllBuyerSalesPaid(${b.id})" style="background:var(--green-600);color:#fff;border:none;border-radius:8px;padding:7px 14px;cursor:pointer;font-size:13px;font-weight:700;font-family:'Tajawal',sans-serif;">✅ سداد الكل دفعة واحدة</button>
+            ${paid > 0.0001 ? `<button onclick="undoAllBuyerPayments(${b.id})" style="background:#fff5f5;color:#dc2626;border:1.5px solid #fca5a5;border-radius:8px;padding:7px 12px;cursor:pointer;font-size:13px;font-weight:700;font-family:'Tajawal',sans-serif;">↩️ تراجع عن الكل</button>` : ''}
           </div>
         </td>
         <td style="text-align:center;">
-          <span id="rem-display-${b.id}" style="font-weight:800; font-size:14px; color:${rem > 0 ? 'var(--danger)' : 'var(--green-600)'};">${rem <= 0 ? '✅ مسدد' : rem.toFixed(3) + ' ر.ع'}</span>
+          <span style="font-weight:800; font-size:14px; color:${rem > 0.001 ? 'var(--danger)' : 'var(--green-600)'};">${rem <= 0.001 ? '✅ الكل مسدد' : rem.toFixed(3) + ' ر.ع'}</span>
+        </td>
+      </tr>`);
+    } else {
+      // ── عرض ملخص (كل المشترين) ──
+      rows.push(`<tr style="cursor:pointer;" onclick="filterFinanceByBuyer(${b.id})">
+        <td><b>${b.name}</b></td>
+        <td style="text-align:center; color:var(--text-muted); font-size:12px;">اضغط لعرض التفاصيل (${buyerSales.length} عملية)</td>
+        <td style="color:var(--green-700);font-weight:700; text-align:center;">${total.toFixed(3)}</td>
+        <td style="text-align:center; color:var(--green-700); font-weight:700;">${paid.toFixed(3)}</td>
+        <td style="text-align:center;">
+          <span style="font-weight:800; font-size:14px; color:${rem > 0.001 ? 'var(--danger)' : 'var(--green-600)'};">${rem <= 0.001 ? '✅ مسدد' : rem.toFixed(3) + ' ر.ع'}</span>
         </td>
       </tr>`);
     }
@@ -2470,74 +2650,173 @@ function filterFinanceByBuyer(buyerId) {
   if (sel) {
     sel.value = String(buyerId);
     renderFinanceTable();
-    // تحديث زر واتساب
     const waBtn = document.getElementById('finance-whatsapp-btn');
     if (waBtn) waBtn.style.display = 'flex';
   }
 }
 
-function updateQuickPay(buyerId) {
-  const input = document.getElementById(`quick-pay-${buyerId}`);
+// ── معاينة فورية أثناء الكتابة في حقل سداد عملية واحدة ──
+function updateSalePayPreview(saleId, saleAmount) {
+  const input = document.getElementById(`sale-pay-${saleId}`);
   if (!input) return;
   const newPaid = parseFloat(input.value) || 0;
-  const buyerSales = DB.sales.filter(s => String(s.buyerId) === String(buyerId));
-  const total = buyerSales.reduce((a, s) => a + parseFloat(s.amount || 0), 0);
-  const rem = total - newPaid;
-  const remDisplay = document.getElementById(`rem-display-${buyerId}`);
+  const rem = saleAmount - newPaid;
+  const remDisplay = document.getElementById(`sale-rem-${saleId}`);
   if (remDisplay) {
-    remDisplay.textContent = rem <= 0 ? '✅ مسدد' : rem.toFixed(3) + ' ر.ع';
-    remDisplay.style.color = rem <= 0 ? 'var(--green-600)' : 'var(--danger)';
+    remDisplay.textContent = rem <= 0.001 ? '✅ مسدد' : rem.toFixed(3) + ' ر.ع';
+    remDisplay.style.color = rem <= 0.001 ? 'var(--green-600)' : 'var(--danger)';
   }
 }
 
-function saveQuickPay(buyerId) {
-  const input = document.getElementById(`quick-pay-${buyerId}`);
+// ── حفظ سداد عملية بيع واحدة محددة (يستبدل قيمة المدفوع لهذه العملية فقط) ──
+async function saveSalePayment(saleId, buyerId) {
+  const input = document.getElementById(`sale-pay-${saleId}`);
   if (!input) return;
-  const newPaidTotal = parseFloat(input.value);
-  if (isNaN(newPaidTotal) || newPaidTotal < 0) {
+  const newPaid = parseFloat(input.value);
+  if (isNaN(newPaid) || newPaid < 0) {
     showAlert('finance-alert', '⚠️ يرجى إدخال مبلغ صحيح', 'error');
     return;
   }
+  const sale = DB.sales.find(s => s.id === saleId);
+  if (!sale) return;
   const buyer = DB.buyers.find(b => String(b.id) === String(buyerId));
   if (!buyer) return;
-  const currentPaid = DB.payments.filter(p => String(p.buyerId) === String(buyerId)).reduce((a, p) => a + parseFloat(p.amount || 0), 0);
-  const diff = newPaidTotal - currentPaid;
-  if (Math.abs(diff) < 0.001) {
-    showAlert('finance-alert', 'ℹ️ لا يوجد تغيير في المبلغ المدفوع', 'info');
-    return;
-  }
-  if (diff > 0) {
+
+  const ok1 = await sysConfirm(`تأكيد حفظ سداد بقيمة (${newPaid.toFixed(3)} ر.ع) لعملية اللوحة رقم (${sale.palmPlate || ''}) فقط؟`, "💾 تأكيد السداد"); if (!ok1) return;
+
+  // إزالة كل الدفعات السابقة المرتبطة بهذه العملية تحديداً، ثم إضافة دفعة جديدة محدثة
+  DB.payments = DB.payments.filter(p => String(p.saleId) !== String(saleId));
+  if (newPaid > 0.0001) {
     DB.payments.push({
       id: nextId(DB.payments),
+      saleId: saleId,
       buyerId: buyer.id,
       buyerName: buyer.name,
-      amount: diff,
-      type: 'جزئي',
+      amount: newPaid,
+      type: 'سداد لعملية محددة',
       date: new Date().toISOString().slice(0, 10),
-      notes: 'دفعة مُسجَّلة من جدول المالية'
+      notes: `سداد لعملية بيع رقم لوحة (${sale.palmPlate || ''})`
     });
-  } else {
-    // خصم من آخر دفعة إذا كان المبلغ الجديد أقل
-    const toRemove = Math.abs(diff);
-    let leftToRemove = toRemove;
-    for (let i = DB.payments.length - 1; i >= 0 && leftToRemove > 0.001; i--) {
-      if (String(DB.payments[i].buyerId) === String(buyerId)) {
-        const p = DB.payments[i];
-        if (p.amount <= leftToRemove) {
-          leftToRemove -= p.amount;
-          DB.payments.splice(i, 1);
-        } else {
-          p.amount -= leftToRemove;
-          leftToRemove = 0;
-        }
-      }
-    }
   }
   saveDB();
   renderFinanceTable();
   updateFinanceStats();
   if (typeof renderSalesTable === 'function') renderSalesTable();
-  showAlert('finance-alert', `✅ تم تحديث المدفوع للمشتري (${buyer.name}) بنجاح`, 'success');
+  showAlert('finance-alert', `✅ تم تحديث سداد عملية اللوحة (${sale.palmPlate || ''}) بنجاح`, 'success');
+}
+
+// ── تسديد كامل لعملية بيع واحدة فقط بضغطة واحدة ──
+async function markSaleFullyPaid(saleId, buyerId, saleAmount) {
+  const sale = DB.sales.find(s => s.id === saleId);
+  if (!sale) return;
+  const ok2 = await sysConfirm(`تأكيد التسديد الكامل بقيمة (${saleAmount.toFixed(3)} ر.ع) لعملية اللوحة رقم (${sale.palmPlate || ''}) فقط؟`, "✅ تأكيد التسديد الكامل"); if (!ok2) return;
+
+  const buyer = DB.buyers.find(b => String(b.id) === String(buyerId));
+  if (!buyer) return;
+
+  DB.payments = DB.payments.filter(p => String(p.saleId) !== String(saleId));
+  if (saleAmount > 0.0001) {
+    DB.payments.push({
+      id: nextId(DB.payments),
+      saleId: saleId,
+      buyerId: buyer.id,
+      buyerName: buyer.name,
+      amount: saleAmount,
+      type: 'سداد كلي',
+      date: new Date().toISOString().slice(0, 10),
+      notes: `سداد كامل لعملية بيع رقم لوحة (${sale.palmPlate || ''})`
+    });
+  }
+  saveDB();
+  renderFinanceTable();
+  updateFinanceStats();
+  if (typeof renderSalesTable === 'function') renderSalesTable();
+  showAlert('finance-alert', `✅ تم التسديد الكامل لعملية اللوحة (${sale.palmPlate || ''}) بنجاح`, 'success');
+}
+
+// ── تسديد كل مشتريات المشتري دفعة واحدة (يسوّي مدفوع كل عملياته على مبلغها الكامل) ──
+async function markAllBuyerSalesPaid(buyerId) {
+  const buyer = DB.buyers.find(b => String(b.id) === String(buyerId));
+  if (!buyer) return;
+  const ok3 = await sysConfirm(`هل تريد تسجيل سداد كامل لجميع عمليات شراء (${buyer.name})؟`, "✅ تأكيد سداد الكل"); if (!ok3) return;
+
+  const phaseFilter = (document.getElementById('finance-phase-filter') || {}).value || '';
+  let buyerSales = DB.sales.filter(s => String(s.buyerId) === String(buyerId));
+  if (phaseFilter) buyerSales = buyerSales.filter(s => String(s.phase) === String(phaseFilter));
+
+  // إزالة كل المدفوعات المرتبطة بهذه العمليات وإضافة دفعة كاملة لكل واحدة
+  const saleIds = new Set(buyerSales.map(s => String(s.id)));
+  DB.payments = DB.payments.filter(p => !(p.saleId && saleIds.has(String(p.saleId))));
+
+  buyerSales.forEach(s => {
+    const amt = parseFloat(s.amount || 0);
+    if (amt > 0) {
+      DB.payments.push({
+        id: nextId(DB.payments),
+        saleId: s.id,
+        buyerId: buyer.id,
+        buyerName: buyer.name,
+        amount: amt,
+        type: 'سداد كلي',
+        date: new Date().toISOString().slice(0, 10),
+        notes: `سداد كامل دفعة واحدة لكل عمليات الشراء`
+      });
+    }
+  });
+
+  saveDB();
+  renderFinanceTable();
+  updateFinanceStats();
+  if (typeof renderSalesTable === 'function') renderSalesTable();
+  showAlert('finance-alert', `✅ تم تسديد جميع مشتريات (${buyer.name}) بالكامل`, 'success');
+}
+
+// ── التراجع عن سداد عملية بيع واحدة محددة (يصفّر المدفوع لهذه العملية فقط) ──
+async function undoSalePayment(saleId, buyerId) {
+  const sale = DB.sales.find(s => s.id === saleId);
+  if (!sale) return;
+  const currentPaid = DB.payments.filter(p => String(p.saleId) === String(saleId))
+    .reduce((a, p) => a + parseFloat(p.amount || 0), 0);
+  if (currentPaid <= 0.0001) {
+    showAlert('finance-alert', 'ℹ️ لا يوجد سداد مسجَّل لهذه العملية للتراجع عنه', 'info');
+    return;
+  }
+  const ok4 = await sysConfirm(`تأكيد التراجع عن سداد بقيمة (${currentPaid.toFixed(3)} ر.ع) لعملية اللوحة رقم (${sale.palmPlate || ''})؟\nسيُعاد المتبقي لهذه العملية إلى (${parseFloat(sale.amount||0).toFixed(3)} ر.ع).`, "↩️ تأكيد التراجع", "تراجع", "danger"); if (!ok4) return;
+
+  DB.payments = DB.payments.filter(p => String(p.saleId) !== String(saleId));
+  saveDB();
+  renderFinanceTable();
+  updateFinanceStats();
+  if (typeof renderSalesTable === 'function') renderSalesTable();
+  showAlert('finance-alert', `↩️ تم التراجع عن سداد عملية اللوحة (${sale.palmPlate || ''}) بنجاح`, 'success');
+}
+
+// ── التراجع عن كل مدفوعات مشتري معيّن (يصفّر كل سداداته دفعة واحدة) ──
+async function undoAllBuyerPayments(buyerId) {
+  const buyer = DB.buyers.find(b => String(b.id) === String(buyerId));
+  if (!buyer) return;
+
+  const phaseFilter = (document.getElementById('finance-phase-filter') || {}).value || '';
+  let buyerSales = DB.sales.filter(s => String(s.buyerId) === String(buyerId));
+  if (phaseFilter) buyerSales = buyerSales.filter(s => String(s.phase) === String(phaseFilter));
+  const saleIds = new Set(buyerSales.map(s => String(s.id)));
+
+  const currentTotalPaid = DB.payments.filter(p => p.saleId && saleIds.has(String(p.saleId)))
+    .reduce((a, p) => a + parseFloat(p.amount || 0), 0);
+
+  if (currentTotalPaid <= 0.0001) {
+    showAlert('finance-alert', 'ℹ️ لا توجد مدفوعات مسجَّلة لهذا المشتري للتراجع عنها', 'info');
+    return;
+  }
+
+  const ok5 = await sysConfirm(`تأكيد التراجع عن كل المدفوعات المسجَّلة لـ (${buyer.name}) بقيمة إجمالية (${currentTotalPaid.toFixed(3)} ر.ع)؟\nستعود جميع عمليات شرائه إلى حالة غير مسدد بالكامل.`, "↩️ تأكيد التراجع عن الكل", "تراجع عن الكل", "danger"); if (!ok5) return;
+
+  DB.payments = DB.payments.filter(p => !(p.saleId && saleIds.has(String(p.saleId))));
+  saveDB();
+  renderFinanceTable();
+  updateFinanceStats();
+  if (typeof renderSalesTable === 'function') renderSalesTable();
+  showAlert('finance-alert', `↩️ تم التراجع عن جميع مدفوعات (${buyer.name}) بنجاح`, 'success');
 }
 
 function sendFinanceBuyerWhatsApp() {
@@ -2577,25 +2856,95 @@ ${palmLines}
 نأمل التكرم بسداد المبلغ المستحق في أقرب وقت ممكن.
 شاكرين حسن تعاونكم.
 
-_تم الإرسال تلقائياً من نظام إدارة الوقف السحابي_`;
+_تم الإرسال تلقائياً من نظام إدارة الوقف - قرية بطين`;
   sendWhatsAppMessage(buyer.phone, message);
 }
 function updateFinanceStats(){
-  const totalSales=DB.sales.reduce((a,s)=>a+parseFloat(s.amount||0),0);
-  const totalPaid=DB.payments.reduce((a,p)=>a+parseFloat(p.amount||0),0);
-  const totalRem=totalSales-totalPaid;
-  const dalala=totalSales*0.05;
-  document.getElementById('finance-stats').innerHTML=`
-    <div class="stat-card"><div class="stat-label">إجمالي المبيعات</div><div class="stat-value">${totalSales.toFixed(3)}</div><div class="stat-unit">ر.ع</div></div>
-    <div class="stat-card"><div class="stat-label">المحصّل</div><div class="stat-value" style="color:var(--green-600)">${totalPaid.toFixed(3)}</div><div class="stat-unit">ر.ع</div></div>
-    <div class="stat-card"><div class="stat-label">المتبقي</div><div class="stat-value" style="color:var(--danger)">${totalRem.toFixed(3)}</div><div class="stat-unit">ر.ع</div></div>
-    <div class="stat-card" style="border:1.5px solid var(--gold-400); background:var(--gold-50);">
-      <div class="stat-label" style="color:var(--gold-600);">الدلالة (5%)</div>
-      <div class="stat-value" style="color:var(--gold-600);">${dalala.toFixed(3)}</div>
-      <div class="stat-unit" style="color:var(--gold-600);">ر.ع</div>
-    </div>
-    <div class="stat-card"><div class="stat-label">عدد المشترين</div><div class="stat-value">${DB.buyers.length}</div></div>
-  `;
+  const phaseFilter = (document.getElementById('finance-phase-filter') || {}).value || '';
+
+  // ── دالة حساب الإحصاء لمرحلة معيّنة (أو الكل إن كانت phaseVal فاضية) ──
+  function calcPhaseStats(phaseVal) {
+    const phaseSales = phaseVal
+      ? DB.sales.filter(s => String(s.phase) === String(phaseVal))
+      : DB.sales;
+    const totalSales = phaseSales.reduce((a,s) => a + parseFloat(s.amount||0), 0);
+
+    // المدفوع: نجمع كل الدفعات المرتبطة بعمليات بيع هذه المرحلة (عبر saleId) + الدفعات الشاملة موزعة نسبياً
+    const saleIdsInPhase = new Set(phaseSales.map(s => String(s.id)));
+    let totalPaid = 0;
+    DB.payments.forEach(p => {
+      if (p.saleId) {
+        // دفعة مرتبطة بعملية بيع محددة
+        if (saleIdsInPhase.has(String(p.saleId))) totalPaid += parseFloat(p.amount||0);
+      } else if (!phaseVal) {
+        // دفعة شاملة (غير مرتبطة بمرحلة) — تُحسب فقط ضمن "كل المراحل"
+        totalPaid += parseFloat(p.amount||0);
+      } else {
+        // دفعة شاملة قديمة ولدينا فلتر مرحلة: نوزّعها نسبياً حسب نسبة مبيعات هذا المشتري بهذه المرحلة
+        const buyerTotalAll = DB.sales.filter(s => String(s.buyerId)===String(p.buyerId)).reduce((a,s)=>a+parseFloat(s.amount||0),0);
+        const buyerTotalPhase = phaseSales.filter(s => String(s.buyerId)===String(p.buyerId)).reduce((a,s)=>a+parseFloat(s.amount||0),0);
+        if (buyerTotalAll > 0) totalPaid += parseFloat(p.amount||0) * (buyerTotalPhase / buyerTotalAll);
+      }
+    });
+
+    const totalRem = totalSales - totalPaid;
+    const dalala = totalSales * 0.05;
+    const buyersCount = new Set(phaseSales.map(s => String(s.buyerId))).size;
+    return { totalSales, totalPaid, totalRem, dalala, buyersCount };
+  }
+
+  const container = document.getElementById('finance-stats');
+
+  if (!phaseFilter) {
+    // عرض 3 صفوف: الإجمالي العام، ثم كل مرحلة بمفردها
+    const overall = calcPhaseStats('');
+    const p1 = calcPhaseStats('1');
+    const p2 = calcPhaseStats('2');
+
+    function statsBlock(title, st, color) {
+      return `
+      <div style="background:#fff; border:1.5px solid var(--border); border-radius:12px; padding:14px 16px; margin-bottom:12px;">
+        <div style="font-weight:800; font-size:14px; color:${color}; margin-bottom:10px; display:flex; align-items:center; gap:6px;">
+          <span style="width:8px;height:8px;border-radius:50%;background:${color};"></span> ${title}
+        </div>
+        <div class="stats-row" style="margin:0;">
+          <div class="stat-card"><div class="stat-label">إجمالي المبيعات</div><div class="stat-value">${st.totalSales.toFixed(3)}</div><div class="stat-unit">ر.ع</div></div>
+          <div class="stat-card"><div class="stat-label">المحصّل</div><div class="stat-value" style="color:var(--green-600)">${st.totalPaid.toFixed(3)}</div><div class="stat-unit">ر.ع</div></div>
+          <div class="stat-card"><div class="stat-label">المتبقي</div><div class="stat-value" style="color:var(--danger)">${st.totalRem.toFixed(3)}</div><div class="stat-unit">ر.ع</div></div>
+          <div class="stat-card" style="border:1.5px solid var(--gold-400); background:var(--gold-50);">
+            <div class="stat-label" style="color:var(--gold-600);">الدلالة (5%)</div>
+            <div class="stat-value" style="color:var(--gold-600);">${st.dalala.toFixed(3)}</div>
+            <div class="stat-unit" style="color:var(--gold-600);">ر.ع</div>
+          </div>
+          <div class="stat-card"><div class="stat-label">عدد المشترين</div><div class="stat-value">${st.buyersCount}</div></div>
+        </div>
+      </div>`;
+    }
+
+    container.innerHTML =
+      statsBlock('📊 الإجمالي العام (كل المراحل)', overall, 'var(--green-700)') +
+      statsBlock('1️⃣ المرحلة الأولى (النغال)', p1, '#b25e04') +
+      statsBlock('2️⃣ المرحلة الثانية (الساير)', p2, '#1d4ed8');
+  } else {
+    // عرض مرحلة واحدة فقط بالتفصيل
+    const st = calcPhaseStats(phaseFilter);
+    const phaseLabel = phaseFilter === '1' ? '1️⃣ المرحلة الأولى (النغال)' : '2️⃣ المرحلة الثانية (الساير)';
+    container.innerHTML = `
+      <div style="background:#fff; border:1.5px solid var(--border); border-radius:12px; padding:14px 16px;">
+        <div style="font-weight:800; font-size:14px; color:var(--green-700); margin-bottom:10px;">${phaseLabel}</div>
+        <div class="stats-row" style="margin:0;">
+          <div class="stat-card"><div class="stat-label">إجمالي المبيعات</div><div class="stat-value">${st.totalSales.toFixed(3)}</div><div class="stat-unit">ر.ع</div></div>
+          <div class="stat-card"><div class="stat-label">المحصّل</div><div class="stat-value" style="color:var(--green-600)">${st.totalPaid.toFixed(3)}</div><div class="stat-unit">ر.ع</div></div>
+          <div class="stat-card"><div class="stat-label">المتبقي</div><div class="stat-value" style="color:var(--danger)">${st.totalRem.toFixed(3)}</div><div class="stat-unit">ر.ع</div></div>
+          <div class="stat-card" style="border:1.5px solid var(--gold-400); background:var(--gold-50);">
+            <div class="stat-label" style="color:var(--gold-600);">الدلالة (5%)</div>
+            <div class="stat-value" style="color:var(--gold-600);">${st.dalala.toFixed(3)}</div>
+            <div class="stat-unit" style="color:var(--gold-600);">ر.ع</div>
+          </div>
+          <div class="stat-card"><div class="stat-label">عدد المشترين</div><div class="stat-value">${st.buyersCount}</div></div>
+        </div>
+      </div>`;
+  }
 }
 function showReport(html){
   document.getElementById('report-content').innerHTML=html;
@@ -2608,10 +2957,10 @@ function reportPalmByTaba() {
   const currentYear = DB.year || new Date().getFullYear();
   const filteredPalms = DB.palms.filter(p => !targetTaba || (p.taba || '').trim() === targetTaba);
   if (!filteredPalms.length) {
-    alert("لا توجد بيانات نخيل لتصديرها لهذه التبعية!");
+    sysToast("لا توجد بيانات نخيل لتصديرها لهذه التبعية!", "warning");
     return;
   }
-  const reportTitle = targetTaba ? `تقرير مبيعات وحالة النخيل التابعة لـ (${targetTaba})` : `التقرير الشامل لبيانات وحالة جميع نخيل الوقف`;
+  const reportTitle = targetTaba ? `تقرير مبيعات وحالة النخيل التابعة لـ (${targetTaba})` : `التقرير الشامل لبيانات وحالة جميع نخيل الوقف - قرية بطين`;
   const container = document.createElement('div');
   container.style.padding = '30px';
   container.style.fontFamily = "'Tajawal', sans-serif";
@@ -2671,7 +3020,7 @@ function reportPalmByTaba() {
   footer.style.color = '#777';
   footer.style.borderTop = '1px dashed #ccc';
   footer.style.paddingTop = '10px';
-  footer.innerHTML = `تطبيق إدارة الوقف الذكي سحابياً © ${currentYear}`;
+  footer.innerHTML = `تطبيق إدارة الوقف - قرية بطين © ${currentYear}`;
   container.appendChild(footer);
   const options = {
     margin:       [10, 10, 10, 10],
@@ -2721,7 +3070,7 @@ function reportFinance() {
   const currentYear = DB.year || new Date().getFullYear();
   const filteredBuyers = DB.buyers.filter(b => !targetBuyerId || String(b.id) === String(targetBuyerId));
   if (!filteredBuyers.length) {
-    alert("لا توجد بيانات مشترين لتوليد التقرير المالي!");
+    sysToast("لا توجد بيانات مشترين لتوليد التقرير المالي!", "warning");
     return;
   }
   let grandTotalDue = 0;
@@ -2793,7 +3142,7 @@ function reportFinance() {
         </tr>
       `}).join('')}
       
-      <!-- 🌟 سطر المجموع المالي العام والخلاصة المفرزة بوضوح للجنة الوقف -->
+      <!-- 🌟 سطر المجموع المالي العام والخلاصة المفرزة بوضوح لوكلاء الوقف -->
       <tr style="background-color: #f9fafb; font-weight: bold; border-top: 2px solid #2d7a47; color: #111;">
         <td colspan="3" style="border: 1px solid #ddd; padding: 12px; text-align: left; color: #1e5c33;">الخلاصة المالية والمجاميع:</td>
         <td style="border: 1px solid #ddd; padding: 12px; text-align: center; background-color: #fff; color: #111;">${grandTotalDue.toFixed(3)} ر.ع</td>
@@ -2810,7 +3159,7 @@ function reportFinance() {
   footer.style.color = '#777';
   footer.style.borderTop = '1px dashed #ccc';
   footer.style.paddingTop = '10px';
-  footer.innerHTML = `نظام الحسابات والمالية السحابي لوقف بطين الذكي © ${currentYear}`;
+  footer.innerHTML = `نظام الحسابات والمالية لوقف قرية بطين © ${currentYear}`;
   container.appendChild(footer);
   const options = {
     margin:       [10, 10, 10, 10],
@@ -2857,7 +3206,7 @@ function exportBackup() {
     a.click();
     document.body.removeChild(a);
   } catch (err) {
-    alert("خطأ أثناء تصدير البيانات!");
+    sysToast("خطأ أثناء تصدير البيانات!", "error");
   }
 }
 function importBackup(input) {
@@ -2868,7 +3217,7 @@ function importBackup(input) {
     try {
       const data = JSON.parse(e.target.result);
       if (!data || (!data.palms && !data.sales && !data.buyers)) {
-        alert("فشل الاستيراد: هذا الملف ليس ملف نسخة احتياطية سليم تابع لنظام الوقف!");
+        sysToast("فشل الاستيراد: هذا الملف ليس ملف نسخة احتياطية سليم تابع لنظام الوقف!", "error");
         input.value = '';
         return;
       }
@@ -2887,10 +3236,10 @@ function importBackup(input) {
         if (typeof populateSaleDropdowns === "function") populateSaleDropdowns();
         if (typeof updateDashboardStats === "function") updateDashboardStats();
         renderDBStats();
-        showAlert('db-stats', 'تم استيراد البيانات ومزامنتها سحابياً بنجاح تام ✅');
+        showAlert('db-stats', 'تم استيراد البيانات ومزامنتها بنجاح تام ✅');
       });
     } catch (err) {
-      alert('خطأ: ملف النسخة الاحتياطية غير صالح أو تالف!');
+      sysToast('خطأ: ملف النسخة الاحتياطية غير صالح أو تالف!', 'error');
     }
   };
   reader.readAsText(file);
@@ -2921,16 +3270,16 @@ function importExcelBuyers(input) {
       saveDB();
       renderBuyerTable();
       if (typeof populateSaleDropdowns === "function") populateSaleDropdowns();
-      alert(`✅ تم استيراد عدد (${added}) مشتري جديد بنجاح إلى النظام.`);
+      sysToast(`تم استيراد عدد (${added}) مشتري جديد بنجاح إلى النظام.`, "success");
     } catch (err) {
-      alert('حدث خطأ أثناء قراءة ملف Excel، تأكد من مطابقة أسماء الأعمدة (الاسم).');
+      sysToast('حدث خطأ أثناء قراءة ملف Excel، تأكد من مطابقة أسماء الأعمدة (الاسم).', "error");
     }
   };
   reader.readAsArrayBuffer(file);
   input.value = '';
 }
-function resetAllData() {
-  const verify = prompt("⚠️ تحذير حرج جداً:\nأنت على وشك حذف وتصفية جميع سجلات المبيعات، المدفوعات، والمراحل المالية الحالية للبدء من جديد مع الاحتفاظ ببيانات النخيل والمشترين الثابتة.\n\nلتأكيد الحذف التام، اكتب كلمة (تصفية) في الحقل أدناه:");
+async function resetAllData() {
+  const verify = await sysPrompt("أنت على وشك حذف وتصفية جميع سجلات المبيعات، المدفوعات، والمراحل المالية الحالية للبدء من جديد مع الاحتفاظ ببيانات النخيل والمشترين الثابتة.\n\nلتأكيد الحذف التام، اكتب كلمة (تصفية):", "⚠️ تحذير حرج جداً", "تصفية");
   const alertDiv = document.getElementById('sales-alert');
   function showResetAlert(message, type = 'success') {
     if (alertDiv) {
@@ -2939,7 +3288,7 @@ function resetAllData() {
       alertDiv.style.display = 'block';
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
-      alert(message);
+      sysToast(message, type);
     }
   }
   if (verify === "تصفية") {
@@ -2948,7 +3297,7 @@ function resetAllData() {
     DB.phase = 1; // إعادة ضبط المرحلة إلى المرحلة الأولى تلقائياً
     if (Array.isArray(DB.palms)) {
       DB.palms.forEach(palm => {
-        palm.status = 'ثمرة';
+        palm.status = 'مثمرة';
         palm.buyerId = null;
         palm.buyerName = '';
         palm.amount = 0;
@@ -2967,8 +3316,8 @@ function resetAllData() {
     const phaseSelect = document.getElementById('sales-phase-select');
     if (phaseSelect) phaseSelect.value = "1";
     showResetAlert("🗑️ تم تصفية كافة سجلات المبيعات والمدفوعات بنجاح، وإعادة تهيئة النخيل لوضع (ثمرة) لبدء موسم جديد نظيف.", "success");
-  } else {
-    alert("❌ تم إلغاء عملية إعادة الضبط؛ الكلمة التأكيدية التي أدخلتها غير صحيحة.");
+  } else if (verify !== null) {
+    sysToast("تم إلغاء عملية إعادة الضبط؛ الكلمة التأكيدية التي أدخلتها غير صحيحة.", "error");
   }
 }
 // دالة تحديث لوحة القيادة (stub للتوافق مع الاستدعاءات)
@@ -2992,7 +3341,7 @@ function showSystemAlert(message, type = 'success') {
 // دالة إرسال واتساب
 function sendWhatsAppMessage(phone, text) {
   if (!phone) {
-    alert("⚠️ لا يوجد رقم هاتف مسجل لهذا المشتري.");
+    sysToast("لا يوجد رقم هاتف مسجل لهذا المشتري.", "warning");
     return;
   }
   const cleaned = String(phone).replace(/\D/g, '');
@@ -3068,7 +3417,7 @@ function renderPalmTable() {
     const locStr = String(p.loc || '').toLowerCase();
     const notesStr = String(p.notes || '').toLowerCase();
     const tabaStr = String(p.taba || '');
-    const statusStr = String(p.status || 'ثمرة');
+    const statusStr = String(p.status || 'مثمرة');
     const isSoldPalm = soldPalmIdsSet.has(String(p.id));
     const matchesSearch = plateStr.indexOf(q) !== -1 || locStr.indexOf(q) !== -1 || notesStr.indexOf(q) !== -1;
     const matchesTaba = !filterTaba || tabaStr === filterTaba;
@@ -3096,7 +3445,11 @@ function renderPalmTable() {
       let badgeClass = 'badge-success';
       if (statusStr === 'غير مثمرة') {
         badgeClass = 'badge-muted';
-      } else if (statusStr === 'مستبعد') {
+      } else if (statusStr === 'صغيرة') {
+        badgeClass = 'badge-muted';
+      } else if (statusStr === 'تالفة') {
+        badgeClass = 'badge-danger';
+      } else if (statusStr === 'أخرى') {
         badgeClass = 'badge-muted';
       }
       // حالة الطناء: هل النخلة مباعة فعلياً في DB.sales؟
@@ -3141,7 +3494,7 @@ function exportTableToPDF(pageId, fileNamePrefix) {
         && (!filterTaba  || ct === filterTaba)
         && (!filterBuyer || String(s.buyerId) === String(filterBuyer));
   });
-  if (!salesData.length) { alert('لا توجد بيانات لتصديرها!'); return; }
+  if (!salesData.length) { sysToast('لا توجد بيانات لتصديرها!', 'warning'); return; }
 
   const buyerObj = filterBuyer ? DB.buyers.find(b => String(b.id) === String(filterBuyer)) : null;
   const parts = [
