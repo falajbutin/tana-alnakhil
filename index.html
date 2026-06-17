@@ -453,7 +453,7 @@
 <div id="app">
   <!-- TOP BAR -->
   <div class="topbar">
-    <div class="topbar-title"><img src="icon-192x192.png" class="topbar-icon" alt=""> طناء نخيل الوقف - قرية بطين</div>
+    <div class="topbar-title"><img src="icon-192x192.png" class="topbar-icon" alt=""> طناء نخيل الوقف - بطين</div>
     <div class="topbar-right">
       <div class="topbar-date" id="topbar-date"></div>
       <button class="btn-logout" onclick="doLogout()">خروج ⇤</button>
@@ -1491,7 +1491,7 @@ async function deleteAllPalmsData() {
     if (typeof populateSaleDropdowns === "function") populateSaleDropdowns(); // لتفريغ قائمة الطناء
     if (typeof updateDashboardStats === "function") updateDashboardStats();
     const alertDiv = document.getElementById('palm-alert') || document.getElementById('sales-alert');
-    const successMsg = "🗑️ تم حذف كامل بيانات النخيل بنجاح من قاعدة البيانات.";
+    const successMsg = "🗑️ تم حذف كامل بيانات النخيل بنجاح من قاعدة البيانات السحابية والمحلية.";
     if (alertDiv) {
       alertDiv.innerHTML = successMsg;
       alertDiv.className = "alert alert-success";
@@ -1642,7 +1642,7 @@ async function deleteAllBuyersData() {
     if (typeof renderBuyerTable === "function") renderBuyerTable();
     if (typeof populateSaleDropdowns === "function") populateSaleDropdowns();
     if (typeof updateDashboardStats === "function") updateDashboardStats();
-    sysToast("تم حذف كامل بيانات وجدول المشترين بنجاح من قاعدة البيانات.", "success");
+    sysToast("تم حذف كامل بيانات وجدول المشترين بنجاح من قاعدة البيانات السحابية والمحلية.", "success");
   } else if (verifyText !== null) {
     sysToast("تم إلغاء عملية الحذف؛ العبارة التأكيدية غير صحيحة.", "error");
   }
@@ -1665,8 +1665,8 @@ function shareBuyerBalanceWhatsApp(buyerId) {
 💵 *إجمالي المبلغ المطلوب:* ${totalDue.toFixed(3)} ر.ع
 ✅ *إجمالي المبالغ المدفوعة:* ${totalPaid.toFixed(3)} ر.ع
 📌 *المبلغ المتبقي المستحق:* *${remaining.toFixed(3)} ر.ع*
-شاكرين لكم حسن تعاونكم وتواصلكم الدائم مع وكلاء الوقف.
-_تم الإرسال تلقائياً من نظام إدارة الوقف - قرية بطين`;
+شاكرين لكم حسن تعاونكم وتواصلكم الدائم مع لجنة الأوقاف.
+_تم الإرسال تلقائياً من نظام إدارة الوقف السحابي_`;
   sendWhatsAppMessage(buyer.phone, messageText);
 }
 function viewBuyerPayments(buyerId, event) {
@@ -1964,7 +1964,7 @@ function generateBuyerPDFReport(salesData, reportTitle, totalAmount, currentYear
         </tr>
       </tbody>
     </table>
-    <div class="ftr">تطبيق إدارة الوقف - قرية بطين © ${currentYear}</div>`;
+    <div class="ftr">تطبيق إدارة الوقف الذكي سحابياً © ${currentYear}</div>`;
 
   const host = document.createElement('div');
   host.style.cssText = 'position:absolute;top:0;left:0;width:100%;background:#fff;z-index:-9999;opacity:0;pointer-events:none;';
@@ -2091,7 +2091,7 @@ function generateSalesPDFReport(salesData, reportTitle, totalAmount, currentYear
 
   const footer = document.createElement('div');
   footer.className = 'rpt-footer';
-  footer.textContent = `تطبيق إدارة الوقف - قرية بطين © ${currentYear}`;
+  footer.textContent = `تطبيق إدارة الوقف الذكي سحابياً © ${currentYear}`;
   container.appendChild(footer);
 
   const savedScroll = window.scrollY;
@@ -2369,6 +2369,43 @@ function renderSalesTable() {
     return;
   }
   let totalAmount = 0;
+
+  // ── دالة موزّعة: حساب مدفوع كل عملية بيع بدقة، تشمل المدفوعات المرتبطة مباشرة (saleId)
+  //    بالإضافة إلى أي دفعات شاملة (lump) قديمة غير مرتبطة بعملية محددة، تُوزَّع تلقائياً
+  //    على عمليات نفس المشتري بالترتيب حتى تُستهلك بالكامل. ──
+  const lumpPaidCache = {}; // buyerId -> المبلغ الشامل المتبقي للتوزيع
+  function getBuyerLumpAvailable(buyerId) {
+    if (lumpPaidCache[buyerId] === undefined) {
+      lumpPaidCache[buyerId] = (DB.payments || [])
+        .filter(p => !p.saleId && String(p.buyerId) === String(buyerId))
+        .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+    }
+    return lumpPaidCache[buyerId];
+  }
+
+  // نحسب مسبقاً مدفوع كل عملية لكل مشتري (بترتيب ظهورها في DB.sales) لتوزيع الدفعات الشاملة بشكل ثابت
+  const directPaidMap = {}; // saleId -> مدفوع مباشر مرتبط بـ saleId
+  DB.sales.forEach(s => {
+    directPaidMap[s.id] = (DB.payments || []).filter(p => String(p.saleId) === String(s.id))
+      .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+  });
+  const lumpRemainingByBuyer = {}; // buyerId -> ما تبقى من الدفعات الشاملة لتوزيعه
+  DB.buyers.forEach(b => { lumpRemainingByBuyer[b.id] = getBuyerLumpAvailable(b.id); });
+
+  // نمر على كل مبيعات المشتري بترتيبها الأصلي (لا الفرز الحالي) لضمان توزيع ثابت لا يتغير بتغيير الفلاتر
+  const salePaidEffective = {}; // saleId -> المدفوع الفعّال (مباشر + حصته من الشامل)
+  DB.sales.forEach(s => {
+    const saleAmount = parseFloat(s.amount) || 0;
+    let paid = directPaidMap[s.id] || 0;
+    let remainingForSale = saleAmount - paid;
+    if (remainingForSale > 0.0001 && lumpRemainingByBuyer[s.buyerId] > 0.0001) {
+      const useFromLump = Math.min(remainingForSale, lumpRemainingByBuyer[s.buyerId]);
+      paid += useFromLump;
+      lumpRemainingByBuyer[s.buyerId] -= useFromLump;
+    }
+    salePaidEffective[s.id] = paid;
+  });
+
   let tableRows = filtered.map((s, i) => {
     const isSelected = (selectedSale === s.id) ? 'selected' : '';
     const palm = DB.palms.find(p => p.id === s.palmId);
@@ -2377,9 +2414,8 @@ function renderSalesTable() {
     const displayType = palm ? palm.type : (s.type || '-');
     const saleAmount = parseFloat(s.amount) || 0;
     totalAmount += saleAmount;
-    // حساب المتبقي لهذه العملية تحديداً (مدفوعات مرتبطة بـ saleId هذه العملية فقط)
-    const salePaid = (DB.payments || []).filter(p => String(p.saleId) === String(s.id))
-      .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+    // المدفوع الفعّال لهذه العملية (مباشر + حصته من أي دفعة شاملة قديمة)
+    const salePaid = salePaidEffective[s.id] || 0;
     const remaining = saleAmount - salePaid;
     let remainingDisplay;
     if (remaining <= 0.001) {
@@ -2470,7 +2506,7 @@ async function closeYear() {
       showAlert('sales-alert', `✅ تم إغلاق عام ${currentYear}م، وفتح حسابات عام ${nextYear}م بنجاح مع ترحيل النخيل والمشترين.`, 'success');
     } catch (error) {
       console.error("خطأ أثناء الإغلاق السنوي:", error);
-      sysToast("حدث خطأ أثناء معالجة الإغلاق السنوي.", "error");
+      sysToast("حدث خطأ أثناء معالجة الإغلاق السنوي سحابياً.", "error");
     }
   });
 }
@@ -2548,7 +2584,7 @@ function renderFinanceTable() {
     return;
   }
 
-  // ── دالة حساب مدفوع عملية بيع واحدة (مدفوعات مرتبطة بـ saleId) ──
+  // ── دالة حساب مدفوع عملية بيع واحدة (مدفوعات مرتبطة مباشرة بـ saleId) ──
   function getSalePaid(saleId) {
     return DB.payments.filter(p => String(p.saleId) === String(saleId))
       .reduce((a, p) => a + parseFloat(p.amount || 0), 0);
@@ -2557,6 +2593,24 @@ function renderFinanceTable() {
   function getBuyerLumpPaid(buyerId) {
     return DB.payments.filter(p => !p.saleId && String(p.buyerId) === String(buyerId))
       .reduce((a, p) => a + parseFloat(p.amount || 0), 0);
+  }
+  // ── توزيع الدفعات الشاملة (القديمة) على عمليات كل مشتري بالترتيب الأصلي حتى تُستهلك،
+  //    لضمان تطابق "المدفوع الفعّال لكل عملية" بين هذا الجدول وجدول عمليات البيع ──
+  const allSalesPaidEffective = {}; // saleId -> مدفوع فعّال (مباشر + حصته من الشامل)
+  {
+    const lumpRemainingByBuyer = {};
+    DB.buyers.forEach(b => { lumpRemainingByBuyer[b.id] = getBuyerLumpPaid(b.id); });
+    DB.sales.forEach(s => {
+      const saleAmount = parseFloat(s.amount) || 0;
+      let paidDirect = getSalePaid(s.id);
+      let remainingForSale = saleAmount - paidDirect;
+      if (remainingForSale > 0.0001 && lumpRemainingByBuyer[s.buyerId] > 0.0001) {
+        const useFromLump = Math.min(remainingForSale, lumpRemainingByBuyer[s.buyerId]);
+        paidDirect += useFromLump;
+        lumpRemainingByBuyer[s.buyerId] -= useFromLump;
+      }
+      allSalesPaidEffective[s.id] = paidDirect;
+    });
   }
 
   let buyersToShow = DB.buyers;
@@ -2577,12 +2631,12 @@ function renderFinanceTable() {
     const rem = total - paid;
 
     if (selectedBuyerIdFilter && String(b.id) === String(selectedBuyerIdFilter)) {
-      // ── عرض تفصيلي: صف لكل نخلة مع سداد مستقل لكل عملية ──
+      // ── عرض تفصيلي: صف لكل نخلة مع سداد مستقل لكل عملية (يشمل حصته من أي دفعة شاملة) ──
       buyerSales.forEach((s, idx) => {
         const palm = DB.palms.find(p => String(p.id) === String(s.palmId));
         const plateDisplay = palm ? palm.plate : (s.palmPlate || '-');
         const saleAmount = parseFloat(s.amount) || 0;
-        const salePaid = getSalePaid(s.id);
+        const salePaid = allSalesPaidEffective[s.id] !== undefined ? allSalesPaidEffective[s.id] : getSalePaid(s.id);
         const saleRem = saleAmount - salePaid;
         const isFirstRow = idx === 0;
         rows.push(`<tr style="background:${idx % 2 === 0 ? '#fff' : '#f9fafb'}">
@@ -2668,6 +2722,69 @@ function updateSalePayPreview(saleId, saleAmount) {
   }
 }
 
+// ── دالة مساعدة: تستهلك (تقلّص) حصة عملية بيع محددة من أي دفعة شاملة (lump) قديمة
+//    خاصة بالمشتري، عبر تقليص أقدم الدفعات الشاملة بمقدار ما كانت "تُحسب" لهذه العملية.
+//    تُستخدم قبل أي تعديل مباشر على دفعة عملية معينة، لمنع ازدواج الحساب لاحقاً. ──
+function consumeLumpShareForSale(saleId, buyerId) {
+  const sale = DB.sales.find(s => s.id === saleId);
+  if (!sale) return;
+  const saleAmount = parseFloat(sale.amount) || 0;
+  const directPaid = DB.payments.filter(p => String(p.saleId) === String(saleId))
+    .reduce((a, p) => a + parseFloat(p.amount || 0), 0);
+  let neededFromLump = saleAmount - directPaid;
+  if (neededFromLump <= 0.0001) return; // العملية مسددة بالكامل مباشرة، لا حاجة لاستهلاك شامل
+
+  // نمر على كل مبيعات المشتري بترتيبها لمعرفة كم استُهلك من الشامل قبل هذه العملية (نفس منطق التوزيع في renderFinanceTable)
+  let lumpRemaining = DB.payments.filter(p => !p.saleId && String(p.buyerId) === String(buyerId))
+    .reduce((a, p) => a + parseFloat(p.amount || 0), 0);
+  if (lumpRemaining <= 0.0001) return;
+
+  const buyerSalesOrdered = DB.sales.filter(s => String(s.buyerId) === String(buyerId));
+  let lumpUsedForThisSale = 0;
+  for (const s of buyerSalesOrdered) {
+    const amt = parseFloat(s.amount) || 0;
+    const dPaid = DB.payments.filter(p => String(p.saleId) === String(s.id))
+      .reduce((a, p) => a + parseFloat(p.amount || 0), 0);
+    let rem = amt - dPaid;
+    if (rem > 0.0001 && lumpRemaining > 0.0001) {
+      const used = Math.min(rem, lumpRemaining);
+      lumpRemaining -= used;
+      if (String(s.id) === String(saleId)) lumpUsedForThisSale = used;
+    }
+    if (String(s.id) === String(saleId)) break;
+  }
+
+  if (lumpUsedForThisSale > 0.0001) {
+    // نقلّص الدفعات الشاملة (من الأقدم) بمقدار lumpUsedForThisSale
+    let toRemove = lumpUsedForThisSale;
+    const lumpPayments = DB.payments.filter(p => !p.saleId && String(p.buyerId) === String(buyerId));
+    for (const p of lumpPayments) {
+      if (toRemove <= 0.0001) break;
+      const pAmt = parseFloat(p.amount) || 0;
+      if (pAmt <= toRemove + 0.0001) {
+        toRemove -= pAmt;
+        p.amount = 0;
+      } else {
+        p.amount = pAmt - toRemove;
+        toRemove = 0;
+      }
+    }
+    DB.payments = DB.payments.filter(p => p.saleId || parseFloat(p.amount || 0) > 0.0001);
+    // نُثبّت ما استُهلك كدفعة مباشرة مرتبطة بهذه العملية تحديداً (migration)
+    const buyer = DB.buyers.find(b => String(b.id) === String(buyerId));
+    DB.payments.push({
+      id: nextId(DB.payments),
+      saleId: saleId,
+      buyerId: buyerId,
+      buyerName: buyer ? buyer.name : '',
+      amount: lumpUsedForThisSale,
+      type: 'مرحّل من سداد شامل',
+      date: new Date().toISOString().slice(0, 10),
+      notes: `جزء من سداد شامل سابق خُصّص تلقائياً لهذه العملية`
+    });
+  }
+}
+
 // ── حفظ سداد عملية بيع واحدة محددة (يستبدل قيمة المدفوع لهذه العملية فقط) ──
 async function saveSalePayment(saleId, buyerId) {
   const input = document.getElementById(`sale-pay-${saleId}`);
@@ -2684,7 +2801,10 @@ async function saveSalePayment(saleId, buyerId) {
 
   const ok1 = await sysConfirm(`تأكيد حفظ سداد بقيمة (${newPaid.toFixed(3)} ر.ع) لعملية اللوحة رقم (${sale.palmPlate || ''}) فقط؟`, "💾 تأكيد السداد"); if (!ok1) return;
 
-  // إزالة كل الدفعات السابقة المرتبطة بهذه العملية تحديداً، ثم إضافة دفعة جديدة محدثة
+  // ── إزالة حصة هذه العملية من أي دفعة شاملة قديمة (lump) عبر تقليصها، لتفادي ازدواج الحساب ──
+  consumeLumpShareForSale(saleId, buyer.id);
+
+  // إزالة كل الدفعات المباشرة السابقة المرتبطة بهذه العملية تحديداً، ثم إضافة دفعة جديدة محدثة
   DB.payments = DB.payments.filter(p => String(p.saleId) !== String(saleId));
   if (newPaid > 0.0001) {
     DB.payments.push({
@@ -2713,6 +2833,8 @@ async function markSaleFullyPaid(saleId, buyerId, saleAmount) {
 
   const buyer = DB.buyers.find(b => String(b.id) === String(buyerId));
   if (!buyer) return;
+
+  consumeLumpShareForSale(saleId, buyer.id);
 
   DB.payments = DB.payments.filter(p => String(p.saleId) !== String(saleId));
   if (saleAmount > 0.0001) {
@@ -2744,9 +2866,13 @@ async function markAllBuyerSalesPaid(buyerId) {
   let buyerSales = DB.sales.filter(s => String(s.buyerId) === String(buyerId));
   if (phaseFilter) buyerSales = buyerSales.filter(s => String(s.phase) === String(phaseFilter));
 
-  // إزالة كل المدفوعات المرتبطة بهذه العمليات وإضافة دفعة كاملة لكل واحدة
+  // إزالة كل المدفوعات المرتبطة بهذه العمليات (مباشرة) وإضافة دفعة كاملة لكل واحدة
   const saleIds = new Set(buyerSales.map(s => String(s.id)));
   DB.payments = DB.payments.filter(p => !(p.saleId && saleIds.has(String(p.saleId))));
+  // إن كنا نسدد كل المراحل (بدون فلتر)، نُزيل أيضاً أي دفعات شاملة قديمة لهذا المشتري لتفادي ازدواج الحساب
+  if (!phaseFilter) {
+    DB.payments = DB.payments.filter(p => !(!p.saleId && String(p.buyerId) === String(buyerId)));
+  }
 
   buyerSales.forEach(s => {
     const amt = parseFloat(s.amount || 0);
@@ -2775,6 +2901,9 @@ async function markAllBuyerSalesPaid(buyerId) {
 async function undoSalePayment(saleId, buyerId) {
   const sale = DB.sales.find(s => s.id === saleId);
   if (!sale) return;
+  const buyer = DB.buyers.find(b => String(b.id) === String(buyerId));
+  if (buyer) consumeLumpShareForSale(saleId, buyer.id);
+
   const currentPaid = DB.payments.filter(p => String(p.saleId) === String(saleId))
     .reduce((a, p) => a + parseFloat(p.amount || 0), 0);
   if (currentPaid <= 0.0001) {
@@ -2801,8 +2930,12 @@ async function undoAllBuyerPayments(buyerId) {
   if (phaseFilter) buyerSales = buyerSales.filter(s => String(s.phase) === String(phaseFilter));
   const saleIds = new Set(buyerSales.map(s => String(s.id)));
 
-  const currentTotalPaid = DB.payments.filter(p => p.saleId && saleIds.has(String(p.saleId)))
+  const directPaid = DB.payments.filter(p => p.saleId && saleIds.has(String(p.saleId)))
     .reduce((a, p) => a + parseFloat(p.amount || 0), 0);
+  const lumpPaid = !phaseFilter
+    ? DB.payments.filter(p => !p.saleId && String(p.buyerId) === String(buyerId)).reduce((a, p) => a + parseFloat(p.amount || 0), 0)
+    : 0;
+  const currentTotalPaid = directPaid + lumpPaid;
 
   if (currentTotalPaid <= 0.0001) {
     showAlert('finance-alert', 'ℹ️ لا توجد مدفوعات مسجَّلة لهذا المشتري للتراجع عنها', 'info');
@@ -2812,6 +2945,9 @@ async function undoAllBuyerPayments(buyerId) {
   const ok5 = await sysConfirm(`تأكيد التراجع عن كل المدفوعات المسجَّلة لـ (${buyer.name}) بقيمة إجمالية (${currentTotalPaid.toFixed(3)} ر.ع)؟\nستعود جميع عمليات شرائه إلى حالة غير مسدد بالكامل.`, "↩️ تأكيد التراجع عن الكل", "تراجع عن الكل", "danger"); if (!ok5) return;
 
   DB.payments = DB.payments.filter(p => !(p.saleId && saleIds.has(String(p.saleId))));
+  if (!phaseFilter) {
+    DB.payments = DB.payments.filter(p => !(!p.saleId && String(p.buyerId) === String(buyerId)));
+  }
   saveDB();
   renderFinanceTable();
   updateFinanceStats();
@@ -2856,7 +2992,7 @@ ${palmLines}
 نأمل التكرم بسداد المبلغ المستحق في أقرب وقت ممكن.
 شاكرين حسن تعاونكم.
 
-_تم الإرسال تلقائياً من نظام إدارة الوقف - قرية بطين`;
+_تم الإرسال تلقائياً من نظام إدارة الوقف السحابي_`;
   sendWhatsAppMessage(buyer.phone, message);
 }
 function updateFinanceStats(){
@@ -2960,7 +3096,7 @@ function reportPalmByTaba() {
     sysToast("لا توجد بيانات نخيل لتصديرها لهذه التبعية!", "warning");
     return;
   }
-  const reportTitle = targetTaba ? `تقرير مبيعات وحالة النخيل التابعة لـ (${targetTaba})` : `التقرير الشامل لبيانات وحالة جميع نخيل الوقف - قرية بطين`;
+  const reportTitle = targetTaba ? `تقرير مبيعات وحالة النخيل التابعة لـ (${targetTaba})` : `التقرير الشامل لبيانات وحالة جميع نخيل الوقف`;
   const container = document.createElement('div');
   container.style.padding = '30px';
   container.style.fontFamily = "'Tajawal', sans-serif";
@@ -3020,7 +3156,7 @@ function reportPalmByTaba() {
   footer.style.color = '#777';
   footer.style.borderTop = '1px dashed #ccc';
   footer.style.paddingTop = '10px';
-  footer.innerHTML = `تطبيق إدارة الوقف - قرية بطين © ${currentYear}`;
+  footer.innerHTML = `تطبيق إدارة الوقف الذكي سحابياً © ${currentYear}`;
   container.appendChild(footer);
   const options = {
     margin:       [10, 10, 10, 10],
@@ -3142,7 +3278,7 @@ function reportFinance() {
         </tr>
       `}).join('')}
       
-      <!-- 🌟 سطر المجموع المالي العام والخلاصة المفرزة بوضوح لوكلاء الوقف -->
+      <!-- 🌟 سطر المجموع المالي العام والخلاصة المفرزة بوضوح للجنة الوقف -->
       <tr style="background-color: #f9fafb; font-weight: bold; border-top: 2px solid #2d7a47; color: #111;">
         <td colspan="3" style="border: 1px solid #ddd; padding: 12px; text-align: left; color: #1e5c33;">الخلاصة المالية والمجاميع:</td>
         <td style="border: 1px solid #ddd; padding: 12px; text-align: center; background-color: #fff; color: #111;">${grandTotalDue.toFixed(3)} ر.ع</td>
@@ -3159,7 +3295,7 @@ function reportFinance() {
   footer.style.color = '#777';
   footer.style.borderTop = '1px dashed #ccc';
   footer.style.paddingTop = '10px';
-  footer.innerHTML = `نظام الحسابات والمالية لوقف قرية بطين © ${currentYear}`;
+  footer.innerHTML = `نظام الحسابات والمالية السحابي لوقف بطين الذكي © ${currentYear}`;
   container.appendChild(footer);
   const options = {
     margin:       [10, 10, 10, 10],
@@ -3236,7 +3372,7 @@ function importBackup(input) {
         if (typeof populateSaleDropdowns === "function") populateSaleDropdowns();
         if (typeof updateDashboardStats === "function") updateDashboardStats();
         renderDBStats();
-        showAlert('db-stats', 'تم استيراد البيانات ومزامنتها بنجاح تام ✅');
+        showAlert('db-stats', 'تم استيراد البيانات ومزامنتها سحابياً بنجاح تام ✅');
       });
     } catch (err) {
       sysToast('خطأ: ملف النسخة الاحتياطية غير صالح أو تالف!', 'error');
