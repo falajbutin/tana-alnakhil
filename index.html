@@ -1123,7 +1123,7 @@ try {
 // ═══════════════════════════════════════
 // DATA LAYER
 // ═══════════════════════════════════════
-let APP_PWD = ''; // سيتم جلبها بأمان من السحابة فور تشغيل التطبيق
+let APP_PWD = localStorage.getItem('nakhl_app_pwd') || '1234'; // قيمة مبدئية آمنة دائماً
 let DB = {
   palms: [], buyers: [], sales: [], payments: [],
   phase: 1, year: new Date().getFullYear()
@@ -1152,6 +1152,7 @@ async function loadDB() {
     const secDoc = await cloudDB.collection("app_data").doc("security").get();
     if (secDoc.exists) {
       APP_PWD = secDoc.data().password;
+      localStorage.setItem('nakhl_app_pwd', APP_PWD); // حفظ للاستخدام أوف-لاين
       console.log("تم تحميل إعدادات الأمان السحابية بنجاح 🔒");
     } else {
       if (!APP_PWD) APP_PWD = '1234';
