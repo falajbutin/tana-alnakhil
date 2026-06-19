@@ -630,8 +630,35 @@
     </div>
     <div id="sales-alert" class="alert"></div>
     <div class="card" style="width: 100%; margin-bottom: 20px;">
-      <div class="card-title" id="sale-form-title">📝 تسجيل عملية بيع جديدة</div>
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
+        <div class="card-title" id="sale-form-title" style="margin-bottom:0;">📝 تسجيل عملية بيع جديدة</div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:13px; color:var(--text-muted);">وضع البيع:</span>
+          <button id="bulk-mode-btn" onclick="toggleBulkMode()" style="
+            background:var(--green-50); color:var(--green-700); border:1.5px solid var(--green-400);
+            border-radius:8px; padding:7px 14px; font-size:13px; font-weight:700;
+            font-family:'Tajawal',sans-serif; cursor:pointer; transition:all 0.2s;">
+            🌴 فردي
+          </button>
+        </div>
+      </div>
       <div id="sale-edit-banner" style="display:none; background:#fff3cd; border:1.5px solid #f0a500; border-radius:8px; padding:10px 16px; margin-bottom:14px; font-size:13px; color:#7a4800; font-weight:600;">✏️ وضع التعديل — يمكنك تغيير المشتري أو القيمة أو التاريخ أو الملاحظات فقط. رقم اللوحة وبيانات النخلة محمية من التغيير.</div>
+
+      <!-- ══ حاوية النخيل المختارة (في وضع البيع الجماعي) ══ -->
+      <div id="bulk-selected-container" style="display:none; margin-bottom:14px;">
+        <div style="background:#f0faf3; border:1.5px solid var(--green-400); border-radius:10px; padding:12px 14px;">
+          <div style="font-weight:700; font-size:13px; color:var(--green-700); margin-bottom:8px;">
+            🌴 النخيل المختارة للبيع الجماعي:
+            <span id="bulk-count-badge" style="background:var(--green-600); color:#fff; border-radius:12px; padding:2px 10px; font-size:12px; margin-right:6px;">0</span>
+          </div>
+          <div id="bulk-selected-tags" style="display:flex; flex-wrap:wrap; gap:6px; min-height:32px;">
+            <span style="color:var(--text-muted); font-size:13px;">لم يتم اختيار أي نخلة بعد...</span>
+          </div>
+          <div id="bulk-price-preview" style="display:none; margin-top:10px; padding:8px 12px; background:#fff; border-radius:8px; border:1px solid var(--green-300); font-size:13px; color:var(--green-800);">
+          </div>
+        </div>
+      </div>
+
       <div class="form-grid">
         <!-- ══ حقل رقم اللوحة - بحث ذكي ══ -->
         <div class="form-group" id="s-plate-group" style="position:relative;">
@@ -676,7 +703,7 @@
         </div>
         <div class="form-group">
           <label class="form-label">القيمة (ر.ع) *</label>
-          <input class="form-input" id="s-amount" type="number" step="0.001" placeholder="0.000" />
+          <input class="form-input" id="s-amount" type="number" step="0.001" placeholder="0.000" oninput="updateBulkPricePreview()" />
         </div>
         <div class="form-group">
           <label class="form-label">التاريخ</label>
@@ -697,8 +724,8 @@
       </div>
       <div class="btn-row" style="margin-top: 20px; margin-bottom: 0;">
         <button class="btn btn-primary" id="sale-save-btn" onclick="saveSale()">💾 حفظ الطناء</button>
-        <button class="btn btn-edit" onclick="editSale()">✏️ تعديل المحدد</button>
-        <button class="btn btn-delete" onclick="deleteSale()">🗑️ حذف المحدد</button>
+        <button class="btn btn-edit" id="sale-edit-btn" onclick="editSale()">✏️ تعديل المحدد</button>
+        <button class="btn btn-delete" id="sale-delete-btn" onclick="deleteSale()">🗑️ حذف المحدد</button>
         <button class="btn btn-outline" onclick="clearSaleForm()">↺ مسح الحقول</button>
         <button class="btn" id="sale-cancel-edit-btn" onclick="clearSaleForm()" style="display:none; background:#6b7280; color:#fff; padding:8px 16px; border-radius:6px; font-family:'Tajawal',sans-serif; border:none; cursor:pointer; font-weight:bold;">✖ إلغاء التعديل</button>
       </div>
@@ -1774,11 +1801,127 @@ function renderPlateDropdown(palms, dropdown) {
     </div>`).join('');
 }
 
+// ── وضع البيع (فردي أو جماعي) ──
+let isBulkMode = false;
+let bulkSelectedPalms = []; // مصفوفة { id, plate, type, taba, loc }
+
+function toggleBulkMode() {
+  isBulkMode = !isBulkMode;
+  const btn = document.getElementById('bulk-mode-btn');
+  const container = document.getElementById('bulk-selected-container');
+  const sPlateGroup = document.getElementById('s-plate-group');
+  const typeGroup = document.querySelector('#s-type').closest('.form-group');
+  const locGroup  = document.querySelector('#s-loc').closest('.form-group');
+  const tabaGroup = document.querySelector('#s-taba').closest('.form-group');
+  const editBtn   = document.getElementById('sale-edit-btn');
+  const deleteBtn = document.getElementById('sale-delete-btn');
+  const saveBtn   = document.getElementById('sale-save-btn');
+
+  if (isBulkMode) {
+    btn.textContent = '📋 جماعي';
+    btn.style.background = 'var(--green-600)';
+    btn.style.color = '#fff';
+    container.style.display = 'block';
+    // في الوضع الجماعي: إخفاء الحقول الفردية الغير ضرورية
+    if (typeGroup) typeGroup.style.display = 'none';
+    if (locGroup)  locGroup.style.display  = 'none';
+    if (tabaGroup) tabaGroup.style.display = 'none';
+    if (editBtn)   editBtn.style.display   = 'none';
+    if (deleteBtn) deleteBtn.style.display = 'none';
+    saveBtn.textContent = '💾 حفظ الطناء الجماعي';
+    document.getElementById('s-plate-search').placeholder = '🔍 ابحث وأضف نخلة للقائمة...';
+    document.getElementById('s-plate-count').textContent = '';
+    bulkSelectedPalms = [];
+    renderBulkTags();
+  } else {
+    btn.textContent = '🌴 فردي';
+    btn.style.background = 'var(--green-50)';
+    btn.style.color = 'var(--green-700)';
+    container.style.display = 'none';
+    if (typeGroup) typeGroup.style.display = '';
+    if (locGroup)  locGroup.style.display  = '';
+    if (tabaGroup) tabaGroup.style.display = '';
+    if (editBtn)   editBtn.style.display   = '';
+    if (deleteBtn) deleteBtn.style.display = '';
+    saveBtn.textContent = '💾 حفظ الطناء';
+    document.getElementById('s-plate-search').placeholder = '🔍 اكتب رقم اللوحة للبحث...';
+    bulkSelectedPalms = [];
+    clearSaleForm();
+  }
+}
+
 function selectPlate(palmId, plateText) {
-  document.getElementById('s-plate').value = palmId;
-  document.getElementById('s-plate-search').value = plateText;
-  document.getElementById('s-plate-dropdown').style.display = 'none';
-  autoFillSale();
+  if (isBulkMode) {
+    // وضع جماعي: أضف للقائمة بدلاً من الاختيار المفرد
+    addPalmToBulk(palmId);
+    // امسح حقل البحث للسماح بالبحث عن نخلة أخرى
+    document.getElementById('s-plate-search').value = '';
+    document.getElementById('s-plate').value = '';
+    document.getElementById('s-plate-dropdown').style.display = 'none';
+  } else {
+    document.getElementById('s-plate').value = palmId;
+    document.getElementById('s-plate-search').value = plateText;
+    document.getElementById('s-plate-dropdown').style.display = 'none';
+    autoFillSale();
+  }
+}
+
+function addPalmToBulk(palmId) {
+  // تجنب التكرار
+  if (bulkSelectedPalms.find(p => String(p.id) === String(palmId))) {
+    sysToast('هذه النخلة مضافة مسبقاً في القائمة', 'warning');
+    return;
+  }
+  const palm = DB.palms.find(p => String(p.id) === String(palmId));
+  if (!palm) return;
+  // تأكد أنها غير مباعة
+  const soldIds = new Set(DB.sales.map(s => String(s.palmId)));
+  if (soldIds.has(String(palmId))) {
+    sysToast(`النخلة رقم (${palm.plate}) مباعة مسبقاً`, 'error');
+    return;
+  }
+  bulkSelectedPalms.push({ id: palm.id, plate: palm.plate, type: palm.type || '', taba: palm.taba || '', loc: palm.loc || '' });
+  renderBulkTags();
+  updateBulkPricePreview();
+}
+
+function removePalmFromBulk(palmId) {
+  bulkSelectedPalms = bulkSelectedPalms.filter(p => String(p.id) !== String(palmId));
+  renderBulkTags();
+  updateBulkPricePreview();
+}
+
+function renderBulkTags() {
+  const container = document.getElementById('bulk-selected-tags');
+  const badge = document.getElementById('bulk-count-badge');
+  badge.textContent = bulkSelectedPalms.length;
+  if (!bulkSelectedPalms.length) {
+    container.innerHTML = '<span style="color:var(--text-muted); font-size:13px;">لم يتم اختيار أي نخلة بعد...</span>';
+    return;
+  }
+  container.innerHTML = bulkSelectedPalms.map(p => `
+    <span style="display:inline-flex; align-items:center; gap:5px; background:var(--green-100);
+      color:var(--green-800); border:1px solid var(--green-300); border-radius:20px;
+      padding:4px 10px; font-size:13px; font-weight:600;">
+      🌴 ${p.plate}
+      <button onclick="removePalmFromBulk(${p.id})" style="background:none; border:none;
+        color:var(--danger); cursor:pointer; font-size:14px; line-height:1; padding:0 2px;">&times;</button>
+    </span>`).join('');
+}
+
+function updateBulkPricePreview() {
+  const preview = document.getElementById('bulk-price-preview');
+  const amountInput = document.getElementById('s-amount');
+  const total = parseFloat(amountInput.value) || 0;
+  const count = bulkSelectedPalms.length;
+  if (!count || !preview) { if (preview) preview.style.display = 'none'; return; }
+  preview.style.display = 'block';
+  if (total > 0) {
+    const perPalm = (total / count).toFixed(3);
+    preview.innerHTML = `💡 المبلغ الإجمالي <b>${total.toFixed(3)} ر.ع</b> ÷ <b>${count}</b> نخلة = <b style="color:var(--green-700)">${perPalm} ر.ع</b> لكل نخلة`;
+  } else {
+    preview.innerHTML = `💡 أدخل المبلغ الإجمالي وسيتم تقسيمه على <b>${count}</b> نخلة تلقائياً`;
+  }
 }
 
 function autoFillSale() {
@@ -2126,14 +2269,10 @@ function populateActiveBuyersFilter() {
   });
   buyerFilterSelect.value = currentValue;
 }
-function autoFillSale() {
-  const palmId = document.getElementById('s-plate').value;
-  const palm = DB.palms.find(p => String(p.id) === String(palmId));
-  document.getElementById('s-type').value = palm ? palm.type : '';
-  document.getElementById('s-loc').value = palm ? (palm.loc||'') : '';
-  document.getElementById('s-taba').value = palm ? palm.taba : '';
-}
 function saveSale() {
+  // ── وضع البيع الجماعي ──
+  if (isBulkMode) { saveBulkSale(); return; }
+
   // في وضع التعديل: استخدم القيمة المخفية المحمية
   const isEditMode = document.getElementById('s-plate-readonly').style.display !== 'none';
   const palmId = isEditMode
@@ -2239,6 +2378,106 @@ function saveSale() {
   clearSaleForm();
   if (document.getElementById('sale-instant-paid')) document.getElementById('sale-instant-paid').checked = false;
 }
+// ══ البيع الجماعي: حفظ عدة نخيل لمشترٍ واحد بمبلغ إجمالي مقسَّم ══
+async function saveBulkSale() {
+  const totalAmount = parseFloat(document.getElementById('s-amount').value);
+  const notes       = document.getElementById('s-notes').value.trim();
+  const saleDateInput = document.getElementById('s-date').value;
+  const saleDate    = saleDateInput || new Date().toISOString().slice(0, 10);
+  const phase       = parseInt(document.getElementById('sales-phase-select').value) || DB.phase || 1;
+  const buyerSearchVal = document.getElementById('s-buyer-search').value.trim();
+  const buyerId     = document.getElementById('s-buyer').value;
+
+  if (!bulkSelectedPalms.length) {
+    sysToast('⚠️ يرجى اختيار نخلة واحدة على الأقل للبيع الجماعي', 'error'); return;
+  }
+  if (isNaN(totalAmount) || totalAmount <= 0) {
+    sysToast('⚠️ يرجى إدخال المبلغ الإجمالي للبيع الجماعي', 'error'); return;
+  }
+  if (!buyerSearchVal) {
+    sysToast('⚠️ يرجى اختيار اسم المشتري', 'error'); return;
+  }
+
+  const count  = bulkSelectedPalms.length;
+  const perPalm = totalAmount / count;
+
+  // تأكيد قبل الحفظ
+  const ok = await sysConfirm(
+    `تأكيد تسجيل طناء ${count} نخلة للمشتري (${buyerSearchVal}) بإجمالي ${totalAmount.toFixed(3)} ر.ع — أي ${perPalm.toFixed(3)} ر.ع لكل نخلة؟`,
+    '🌴 تأكيد البيع الجماعي', 'حفظ الجماعي', 'success'
+  );
+  if (!ok) return;
+
+  // التحقق من المشتري أو إضافته
+  let buyer;
+  if (!buyerId || buyerId === 'new') {
+    const exists = DB.buyers.find(b => b.name.trim().toLowerCase() === buyerSearchVal.toLowerCase());
+    if (exists) {
+      buyer = exists;
+    } else {
+      buyer = { id: nextId(DB.buyers), name: buyerSearchVal, phone: '', notes: 'تمت الإضافة تلقائياً أثناء الطناء الجماعي' };
+      DB.buyers.push(buyer);
+    }
+  } else {
+    buyer = DB.buyers.find(b => String(b.id) === String(buyerId));
+  }
+  if (!buyer) { sysToast('❌ خطأ: المشتري غير موجود', 'error'); return; }
+
+  const isInstantPaid = document.getElementById('sale-instant-paid') ? document.getElementById('sale-instant-paid').checked : false;
+
+  // حفظ عملية لكل نخلة
+  bulkSelectedPalms.forEach(bp => {
+    const palm = DB.palms.find(p => String(p.id) === String(bp.id));
+    if (!palm) return;
+    const saleId = nextId(DB.sales);
+    DB.sales.push({
+      id: saleId,
+      palmId: palm.id, palmPlate: palm.plate,
+      taba: palm.taba, type: palm.type,
+      buyerId: buyer.id, buyerName: buyer.name,
+      amount: perPalm, phase, date: saleDate,
+      notes: notes || `بيع جماعي — ${count} نخلة — مجموع ${totalAmount.toFixed(3)} ر.ع`
+    });
+    palm.status = 'مباع';
+    palm.buyerId = buyer.id;
+    palm.buyerName = buyer.name;
+    palm.amount = perPalm;
+
+    if (isInstantPaid) {
+      if (!DB.payments) DB.payments = [];
+      DB.payments.push({
+        id: nextId(DB.payments),
+        saleId: saleId,
+        buyerId: buyer.id, buyerName: buyer.name,
+        amount: perPalm, type: 'سداد كلي',
+        date: saleDate,
+        notes: `سداد فوري لنخلة (${palm.plate}) ضمن بيع جماعي`
+      });
+    }
+  });
+
+  saveDB();
+  populateSaleDropdowns();
+  renderSalesTable();
+  renderPalmTable();
+  renderPalmStats();
+  if (typeof renderFinanceTable === 'function') renderFinanceTable();
+  if (typeof updateFinanceStats === 'function') updateFinanceStats();
+
+  sysToast(`✅ تم تسجيل طناء ${count} نخلة بنجاح للمشتري (${buyer.name}) — ${perPalm.toFixed(3)} ر.ع لكل نخلة`, 'success');
+
+  // إعادة تعيين الوضع الجماعي
+  bulkSelectedPalms = [];
+  renderBulkTags();
+  document.getElementById('s-amount').value = '';
+  document.getElementById('s-notes').value  = '';
+  document.getElementById('s-buyer-search').value = '';
+  document.getElementById('s-buyer').value = '';
+  document.getElementById('s-buyer-new-badge').style.display = 'none';
+  document.getElementById('bulk-price-preview').style.display = 'none';
+  if (document.getElementById('sale-instant-paid')) document.getElementById('sale-instant-paid').checked = false;
+}
+
 function editSale(){
   if(selectedSale===null){showAlert('sales-alert','يرجى تحديد سجل','error');return;}
   const s=DB.sales.find(x=>x.id===selectedSale);
@@ -2339,7 +2578,7 @@ function clearSaleForm() {
   const cancelBtnEl = document.getElementById('sale-cancel-edit-btn');
   if (titleEl)     titleEl.textContent = '📝 تسجيل عملية بيع جديدة';
   if (bannerEl)    bannerEl.style.display = 'none';
-  if (saveBtnEl)   { saveBtnEl.textContent = '💾 حفظ الطناء'; saveBtnEl.style.background = ''; }
+  if (saveBtnEl)   { saveBtnEl.style.background = ''; }
   if (cancelBtnEl) cancelBtnEl.style.display = 'none';
   // ── تنظيف بقية الحقول ──
   document.getElementById('s-type').value   = '';
@@ -2348,6 +2587,16 @@ function clearSaleForm() {
   document.getElementById('s-amount').value = '';
   document.getElementById('s-notes').value  = '';
   document.getElementById('s-date').value   = new Date().toLocaleDateString('en-CA');
+  // ── إعادة ضبط الوضع الجماعي (مسح القائمة فقط، لا تغيير الوضع) ──
+  if (isBulkMode) {
+    bulkSelectedPalms = [];
+    renderBulkTags();
+    const preview = document.getElementById('bulk-price-preview');
+    if (preview) preview.style.display = 'none';
+    // في وضع البيع الجماعي: لا نعيد تعيين عنوان الزر
+  } else {
+    if (saveBtnEl) { saveBtnEl.textContent = '💾 حفظ الطناء'; saveBtnEl.style.background = ''; }
+  }
   document.querySelectorAll('#sales-tbody tr').forEach(r => r.classList.remove('selected'));
 }
 function renderSalesTable() {
